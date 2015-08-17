@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# http://unix.stackexchange.com/a/17500
+SCRIPTPATH="$(dirname "$(readlink -f "$0")")"
+
+# usage
+if [[ "$#" -ne 2 ]]; then
+    echo "Usage: asciidoc50 /path/to/template-dir /path/to/file"
+    exit
+fi
+
+echo -e -n "\033[33m"
+echo "Rendering $2 as HTML..."
+echo -e -n "\033[39m"
+"$SCRIPTPATH"/asciidoctor -a coderay-css=class,coderay-linenums-mode=inline,data-uri,idprefix=,imagesdir=.,sectlinks,source-highlighter=coderay,toc=left,toclevels=4 -b html5 -T "$1" --trace `basename "$2"`
+
+echo -e -n "\033[33m"
+echo "Rendering $2 as PDF..."
+echo -e -n "\033[39m"
+"$SCRIPTPATH"/asciidoctor -a imagesdir=.,sectnums! -b docbook -d article --trace `basename "$2"`
+"$SCRIPTPATH"/../lib/asciidoctor-fopub-master/fopub -f pdf -t "$SCRIPTPATH"/../includes/docbook-xsl `basename "$2" .adoc`.xml
+rm -f `basename "$2" .adoc`.xml
