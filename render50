@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import argparse
+import glob
 import os
 import signal
 import sys
@@ -9,15 +10,11 @@ import textwrap
 
 from backports.shutil_which import which
 from backports.shutil_get_terminal_size import get_terminal_size
+from natsort import natsorted
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
 import termcolor
-
-
-class Error(Exception):
-    """Exception raised for errors."""
-    pass
 
 
 def main():
@@ -38,14 +35,10 @@ def main():
             help="recurse into directories")
     parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="input to render", nargs="+")
-    parser.add_argument("-i", "--include", action="append", help="pattern to include", nargs=1)
-    parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude", nargs=1)
+    parser.add_argument("-i", "--include", action="append", help="pattern to include")
+    parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     args = parser.parse_args(sys.argv[1:])
     
-    # Require wkhtmltopdf
-    if not which("wkhtmltopdf"):
-        raise Error("You don't have wkhtmltopdf installed. Install wkhtmltopdf, then re-run render50!.")
-
     # Ensure output ends in .pdf
     output = args.output
     if not output.lower().endswith(".pdf"):
@@ -54,17 +47,16 @@ def main():
     # Create parent directory as needed
     output = os.path.realpath(output)
     dirname = os.path.dirname(output)
-    print(dirname)
     if not os.path.isdir(dirname):
         while True:
-            s = input("Create {}? ".format(dirname))
+            s = input("Create {}? ".format(dirname)).strip()
             if s.lower() in ["n", "no"]:
-                raise Error()
+                raise RuntimeError()
             elif s.lower() in ["y", "yes"]:
                 try:
                     os.makedirs(dirname)
                 except Exception:
-                    e = Error("Could not create {}.".format(dirname))
+                    e = RuntimeError("Could not create {}.".format(dirname))
                     e.__cause__ = None
                     raise e
 
@@ -73,10 +65,40 @@ def main():
         while True:
             s = input("Overwrite {}? ".format(output))
             if s.lower() in ["n", "no"]:
-                raise Error()
+                raise RuntimeError()
 
     # Check for includes
-    # TODO
+    includes = []
+    if args.include:
+        for i in args.include:
+            includes.append(i.replace(".", "\.").replace("|", "\|").replace("*", ".*"))
+
+    # Check for excludes
+    excludes = []
+    if args.exclude:
+        for i in args.exclude:
+            excludes.append(i.replace(".", "\.").replace("|", "\|").replace("*", ".*"))
+
+    # Check stdin for inputs else command line
+    patterns = []
+    if len(args.input) == 1 and args.input[0] == "-":
+        patterns = sys.stdin.read().splitlines()
+    else:
+        patterns = args.input
+
+    # Glob patterns lest shell (e.g., Windows) not have done so
+    inputs = []
+    for pattern in patterns:
+        paths = natsorted(glob.glob(pattern))
+        inputs += paths
+
+    # Queue files and directories to render
+    queue = []
+    for input in inputs:
+        pass # TODO
+
+    print(inputs)
+    sys.exit()
 
     # Check for excludes
     # TODO
@@ -121,8 +143,9 @@ def cprint(text="", color=None, on_color=None, attrs=None, **kwargs):
 def excepthook(type, value, tb):
     """Report an exception."""
     excepthook.ignore = False
-    if type is Error and str(value):
+    if type is RuntimeError and str(value):
         cprint(str(value), "yellow")
+    cprint(str(value), "yellow")
     cprint("Rendering cancelled.", "red")
 sys.excepthook = excepthook
 
