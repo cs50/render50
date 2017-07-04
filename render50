@@ -154,10 +154,11 @@ def main():
                 cprint("Skipping {} because binary...".format(queued), "yellow")
                 continue
 
-            # Highlight code unless file is empty
+            # Highlight code unless file is empty, using inline line numbers to avoid
+            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
             string = ""
             if code.strip():
-                string = highlight(code, guess_lexer_for_filename(queued, code), HtmlFormatter(linenos=True, nobackground=True))
+                string = highlight(code, guess_lexer_for_filename(queued, code), HtmlFormatter(linenos="inline", nobackground=True))
 
             # Stylize document
             stylesheets = [
@@ -167,8 +168,8 @@ def main():
                     CSS(string="* { font-family: monospace; font-size: 10pt; }"),
                     CSS(string=HtmlFormatter().get_style_defs('.highlight')),
                     CSS(string=".highlight { background: initial; }"),
-                    CSS(string=".linenos { color: #808080; }"),
-                    CSS(string=".linenos pre:after { content: '  '; }")]
+                    CSS(string=".lineno { color: #808080; }"),
+                    CSS(string=".lineno:after { content: '  '; }")]
 
             # Render document
             cprint("Rendering {}...".format(queued))

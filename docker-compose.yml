@@ -1,3 +1,0 @@
-render50:
-  volumes:
-   - .:/home/ubuntu

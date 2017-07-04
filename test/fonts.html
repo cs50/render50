@@ -1,0 +1,383 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+
+<html>
+<head>
+  <title></title>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <style type="text/css">
+td.linenos { background-color: #f0f0f0; padding-right: 10px; }
+span.lineno { background-color: #f0f0f0; padding: 0 5px 0 5px; }
+pre { line-height: 125%; }
+body .hll { background-color: #ffffcc }
+body  { background: #f8f8f8; }
+body .c { color: #408080; font-style: italic } /* Comment */
+body .err { border: 1px solid #FF0000 } /* Error */
+body .k { color: #008000; font-weight: bold } /* Keyword */
+body .o { color: #666666 } /* Operator */
+body .ch { color: #408080; font-style: italic } /* Comment.Hashbang */
+body .cm { color: #408080; font-style: italic } /* Comment.Multiline */
+body .cp { color: #BC7A00 } /* Comment.Preproc */
+body .cpf { color: #408080; font-style: italic } /* Comment.PreprocFile */
+body .c1 { color: #408080; font-style: italic } /* Comment.Single */
+body .cs { color: #408080; font-style: italic } /* Comment.Special */
+body .gd { color: #A00000 } /* Generic.Deleted */
+body .ge { font-style: italic } /* Generic.Emph */
+body .gr { color: #FF0000 } /* Generic.Error */
+body .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+body .gi { color: #00A000 } /* Generic.Inserted */
+body .go { color: #888888 } /* Generic.Output */
+body .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+body .gs { font-weight: bold } /* Generic.Strong */
+body .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+body .gt { color: #0044DD } /* Generic.Traceback */
+body .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+body .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+body .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+body .kp { color: #008000 } /* Keyword.Pseudo */
+body .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+body .kt { color: #B00040 } /* Keyword.Type */
+body .m { color: #666666 } /* Literal.Number */
+body .s { color: #BA2121 } /* Literal.String */
+body .na { color: #7D9029 } /* Name.Attribute */
+body .nb { color: #008000 } /* Name.Builtin */
+body .nc { color: #0000FF; font-weight: bold } /* Name.Class */
+body .no { color: #880000 } /* Name.Constant */
+body .nd { color: #AA22FF } /* Name.Decorator */
+body .ni { color: #999999; font-weight: bold } /* Name.Entity */
+body .ne { color: #D2413A; font-weight: bold } /* Name.Exception */
+body .nf { color: #0000FF } /* Name.Function */
+body .nl { color: #A0A000 } /* Name.Label */
+body .nn { color: #0000FF; font-weight: bold } /* Name.Namespace */
+body .nt { color: #008000; font-weight: bold } /* Name.Tag */
+body .nv { color: #19177C } /* Name.Variable */
+body .ow { color: #AA22FF; font-weight: bold } /* Operator.Word */
+body .w { color: #bbbbbb } /* Text.Whitespace */
+body .mb { color: #666666 } /* Literal.Number.Bin */
+body .mf { color: #666666 } /* Literal.Number.Float */
+body .mh { color: #666666 } /* Literal.Number.Hex */
+body .mi { color: #666666 } /* Literal.Number.Integer */
+body .mo { color: #666666 } /* Literal.Number.Oct */
+body .sa { color: #BA2121 } /* Literal.String.Affix */
+body .sb { color: #BA2121 } /* Literal.String.Backtick */
+body .sc { color: #BA2121 } /* Literal.String.Char */
+body .dl { color: #BA2121 } /* Literal.String.Delimiter */
+body .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+body .s2 { color: #BA2121 } /* Literal.String.Double */
+body .se { color: #BB6622; font-weight: bold } /* Literal.String.Escape */
+body .sh { color: #BA2121 } /* Literal.String.Heredoc */
+body .si { color: #BB6688; font-weight: bold } /* Literal.String.Interpol */
+body .sx { color: #008000 } /* Literal.String.Other */
+body .sr { color: #BB6688 } /* Literal.String.Regex */
+body .s1 { color: #BA2121 } /* Literal.String.Single */
+body .ss { color: #19177C } /* Literal.String.Symbol */
+body .bp { color: #008000 } /* Name.Builtin.Pseudo */
+body .fm { color: #0000FF } /* Name.Function.Magic */
+body .vc { color: #19177C } /* Name.Variable.Class */
+body .vg { color: #19177C } /* Name.Variable.Global */
+body .vi { color: #19177C } /* Name.Variable.Instance */
+body .vm { color: #19177C } /* Name.Variable.Magic */
+body .il { color: #666666 } /* Literal.Number.Integer.Long */
+
+  </style>
+</head>
+<body>
+<h2></h2>
+
+<div class="highlight"><pre><span></span><span class="c1"># coding: utf-8</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    weasyprint.fonts</span>
+<span class="sd">    ----------------</span>
+
+<span class="sd">    Interface with external libraries managing fonts installed on the system.</span>
+
+<span class="sd">    :copyright: Copyright 2011-2016 Simon Sapin and contributors, see AUTHORS.</span>
+<span class="sd">    :license: BSD, see LICENSE for details.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">.compat</span> <span class="kn">import</span> <span class="n">FILESYSTEM_ENCODING</span>
+<span class="kn">from</span> <span class="nn">.logger</span> <span class="kn">import</span> <span class="n">LOGGER</span>
+<span class="kn">from</span> <span class="nn">.text</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">cairo</span><span class="p">,</span> <span class="n">dlopen</span><span class="p">,</span> <span class="n">ffi</span><span class="p">,</span> <span class="n">get_font_features</span><span class="p">,</span> <span class="n">gobject</span><span class="p">,</span> <span class="n">pango</span><span class="p">,</span> <span class="n">pangocairo</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.urls</span> <span class="kn">import</span> <span class="n">fetch</span>
+
+<span class="c1"># XXX No unicode_literals, cffi likes native strings</span>
+
+
+<span class="k">class</span> <span class="nc">FontConfiguration</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Font configuration&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a font configuration before rendering a document.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">font_map</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">add_font_face</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule_descriptors</span><span class="p">,</span> <span class="n">url_fetcher</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add a font into the application.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Clean a font configuration after rendering a document.&quot;&quot;&quot;</span>
+
+
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;win&#39;</span><span class="p">):</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;@font-face is currently not supported on Windows&#39;</span><span class="p">)</span>
+<span class="k">elif</span> <span class="n">pango</span><span class="o">.</span><span class="n">pango_version</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">13800</span><span class="p">:</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;@font-face support needs Pango &gt;= 1.38&#39;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">ffi</span><span class="o">.</span><span class="n">cdef</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">        // FontConfig</span>
+
+<span class="s1">        typedef int FcBool;</span>
+<span class="s1">        typedef struct _FcConfig FcConfig;</span>
+<span class="s1">        typedef struct _FcPattern FcPattern;</span>
+<span class="s1">        typedef unsigned char FcChar8;</span>
+
+<span class="s1">        typedef enum {</span>
+<span class="s1">            FcResultMatch, FcResultNoMatch, FcResultTypeMismatch, FcResultNoId,</span>
+<span class="s1">            FcResultOutOfMemory</span>
+<span class="s1">        } FcResult;</span>
+
+<span class="s1">        typedef enum {</span>
+<span class="s1">            FcMatchPattern, FcMatchFont, FcMatchScan</span>
+<span class="s1">        } FcMatchKind;</span>
+
+<span class="s1">        FcConfig * FcInitLoadConfigAndFonts (void);</span>
+<span class="s1">        FcPattern * FcConfigDestroy (FcConfig *config);</span>
+<span class="s1">        FcBool FcConfigAppFontAddFile (</span>
+<span class="s1">            FcConfig *config, const FcChar8 *file);</span>
+<span class="s1">        FcConfig * FcConfigGetCurrent (void);</span>
+<span class="s1">        FcBool FcConfigSetCurrent (FcConfig *config);</span>
+<span class="s1">        FcBool FcConfigParseAndLoad (</span>
+<span class="s1">            FcConfig *config, const FcChar8 *file, FcBool complain);</span>
+
+<span class="s1">        void FcDefaultSubstitute (FcPattern *pattern);</span>
+<span class="s1">        FcBool FcConfigSubstitute (</span>
+<span class="s1">            FcConfig *config, FcPattern *p, FcMatchKind kind);</span>
+
+<span class="s1">        FcPattern * FcPatternCreate (void);</span>
+<span class="s1">        FcPattern * FcPatternDestroy (FcPattern *p);</span>
+<span class="s1">        FcBool FcPatternAddString (</span>
+<span class="s1">            FcPattern *p, const char *object, const FcChar8 *s);</span>
+<span class="s1">        FcResult FcPatternGetString (</span>
+<span class="s1">            FcPattern *p, const char *object, int n, FcChar8 **s);</span>
+<span class="s1">        FcPattern * FcFontMatch (</span>
+<span class="s1">            FcConfig *config, FcPattern *p, FcResult *result);</span>
+
+
+<span class="s1">        // PangoFT2</span>
+
+<span class="s1">        typedef ... PangoFcFontMap;</span>
+
+<span class="s1">        void pango_fc_font_map_set_config (</span>
+<span class="s1">            PangoFcFontMap *fcfontmap, FcConfig *fcconfig);</span>
+<span class="s1">        void pango_fc_font_map_shutdown (PangoFcFontMap *fcfontmap);</span>
+
+
+<span class="s1">        // PangoCairo</span>
+
+<span class="s1">        typedef ... PangoCairoFontMap;</span>
+
+<span class="s1">        void pango_cairo_font_map_set_default (PangoCairoFontMap *fontmap);</span>
+<span class="s1">        PangoFontMap * pango_cairo_font_map_new_for_font_type (</span>
+<span class="s1">            cairo_font_type_t fonttype);</span>
+<span class="s1">    &#39;&#39;&#39;</span><span class="p">)</span>
+
+    <span class="n">fontconfig</span> <span class="o">=</span> <span class="n">dlopen</span><span class="p">(</span><span class="n">ffi</span><span class="p">,</span> <span class="s1">&#39;fontconfig&#39;</span><span class="p">,</span> <span class="s1">&#39;libfontconfig&#39;</span><span class="p">,</span>
+                        <span class="s1">&#39;libfontconfig.so.1&#39;</span><span class="p">,</span> <span class="s1">&#39;libfontconfig-1.dylib&#39;</span><span class="p">)</span>
+    <span class="n">pangoft2</span> <span class="o">=</span> <span class="n">dlopen</span><span class="p">(</span><span class="n">ffi</span><span class="p">,</span> <span class="s1">&#39;pangoft2-1.0&#39;</span><span class="p">,</span> <span class="s1">&#39;libpangoft2-1.0-0&#39;</span><span class="p">,</span>
+                      <span class="s1">&#39;libpangoft2-1.0.so&#39;</span><span class="p">,</span> <span class="s1">&#39;libpangoft2-1.0.dylib&#39;</span><span class="p">)</span>
+
+    <span class="n">FONTCONFIG_WEIGHT_CONSTANTS</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;normal&#39;</span><span class="p">:</span> <span class="s1">&#39;normal&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;bold&#39;</span><span class="p">:</span> <span class="s1">&#39;bold&#39;</span><span class="p">,</span>
+        <span class="mi">100</span><span class="p">:</span> <span class="s1">&#39;thin&#39;</span><span class="p">,</span>
+        <span class="mi">200</span><span class="p">:</span> <span class="s1">&#39;extralight&#39;</span><span class="p">,</span>
+        <span class="mi">300</span><span class="p">:</span> <span class="s1">&#39;light&#39;</span><span class="p">,</span>
+        <span class="mi">400</span><span class="p">:</span> <span class="s1">&#39;normal&#39;</span><span class="p">,</span>
+        <span class="mi">500</span><span class="p">:</span> <span class="s1">&#39;medium&#39;</span><span class="p">,</span>
+        <span class="mi">600</span><span class="p">:</span> <span class="s1">&#39;demibold&#39;</span><span class="p">,</span>
+        <span class="mi">700</span><span class="p">:</span> <span class="s1">&#39;bold&#39;</span><span class="p">,</span>
+        <span class="mi">800</span><span class="p">:</span> <span class="s1">&#39;extrabold&#39;</span><span class="p">,</span>
+        <span class="mi">900</span><span class="p">:</span> <span class="s1">&#39;black&#39;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">FONTCONFIG_STYLE_CONSTANTS</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;normal&#39;</span><span class="p">:</span> <span class="s1">&#39;roman&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;italic&#39;</span><span class="p">:</span> <span class="s1">&#39;italic&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;oblique&#39;</span><span class="p">:</span> <span class="s1">&#39;oblique&#39;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">FONTCONFIG_STRETCH_CONSTANTS</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;normal&#39;</span><span class="p">:</span> <span class="s1">&#39;normal&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;ultra-condensed&#39;</span><span class="p">:</span> <span class="s1">&#39;ultracondensed&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;extra-condensed&#39;</span><span class="p">:</span> <span class="s1">&#39;extracondensed&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;condensed&#39;</span><span class="p">:</span> <span class="s1">&#39;condensed&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;semi-condensed&#39;</span><span class="p">:</span> <span class="s1">&#39;semicondensed&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;semi-expanded&#39;</span><span class="p">:</span> <span class="s1">&#39;semiexpanded&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;expanded&#39;</span><span class="p">:</span> <span class="s1">&#39;expanded&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;extra-expanded&#39;</span><span class="p">:</span> <span class="s1">&#39;extraexpanded&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;ultra-expanded&#39;</span><span class="p">:</span> <span class="s1">&#39;ultraexpanded&#39;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">class</span> <span class="nc">FontConfiguration</span><span class="p">(</span><span class="n">FontConfiguration</span><span class="p">):</span>
+        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Create a FT2 font configuration.</span>
+
+<span class="sd">            See Behdad&#39;s blog:</span>
+<span class="sd">            https://mces.blogspot.fr/2015/05/</span>
+<span class="sd">                    how-to-use-custom-application-fonts.html</span>
+
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fontconfig_config</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">gc</span><span class="p">(</span>
+                <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcInitLoadConfigAndFonts</span><span class="p">(),</span>
+                <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcConfigDestroy</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">font_map</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">gc</span><span class="p">(</span>
+                <span class="n">pangocairo</span><span class="o">.</span><span class="n">pango_cairo_font_map_new_for_font_type</span><span class="p">(</span>
+                    <span class="n">cairo</span><span class="o">.</span><span class="n">FONT_TYPE_FT</span><span class="p">),</span>
+                <span class="n">gobject</span><span class="o">.</span><span class="n">g_object_unref</span><span class="p">)</span>
+            <span class="n">pangoft2</span><span class="o">.</span><span class="n">pango_fc_font_map_set_config</span><span class="p">(</span>
+                <span class="n">ffi</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s1">&#39;PangoFcFontMap *&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">font_map</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fontconfig_config</span><span class="p">)</span>
+            <span class="c1"># pango_fc_font_map_set_config keeps a reference to config</span>
+            <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcConfigDestroy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fontconfig_config</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_filenames</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span> <span class="nf">add_font_face</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rule_descriptors</span><span class="p">,</span> <span class="n">url_fetcher</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">font_type</span><span class="p">,</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">rule_descriptors</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">font_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;external&#39;</span><span class="p">,</span> <span class="s1">&#39;local&#39;</span><span class="p">):</span>
+                    <span class="n">config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fontconfig_config</span>
+                    <span class="k">if</span> <span class="n">font_type</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span><span class="p">:</span>
+                        <span class="n">font_name</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                        <span class="n">pattern</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">gc</span><span class="p">(</span>
+                            <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternCreate</span><span class="p">(),</span>
+                            <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternDestroy</span><span class="p">)</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcConfigSubstitute</span><span class="p">(</span>
+                            <span class="n">config</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcMatchFont</span><span class="p">)</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcDefaultSubstitute</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternAddString</span><span class="p">(</span>
+                            <span class="n">pattern</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;fullname&#39;</span><span class="p">,</span> <span class="n">font_name</span><span class="p">)</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternAddString</span><span class="p">(</span>
+                            <span class="n">pattern</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;postscriptname&#39;</span><span class="p">,</span> <span class="n">font_name</span><span class="p">)</span>
+                        <span class="n">family</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;FcChar8 **&#39;</span><span class="p">)</span>
+                        <span class="n">postscript</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;FcChar8 **&#39;</span><span class="p">)</span>
+                        <span class="n">result</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;FcResult *&#39;</span><span class="p">)</span>
+                        <span class="n">matching_pattern</span> <span class="o">=</span> <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcFontMatch</span><span class="p">(</span>
+                            <span class="n">config</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+                        <span class="c1"># TODO: do many fonts have multiple family values?</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternGetString</span><span class="p">(</span>
+                            <span class="n">matching_pattern</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;fullname&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">family</span><span class="p">)</span>
+                        <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternGetString</span><span class="p">(</span>
+                            <span class="n">matching_pattern</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;postscriptname&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">postscript</span><span class="p">)</span>
+                        <span class="n">family</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">string</span><span class="p">(</span><span class="n">family</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="n">postscript</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">string</span><span class="p">(</span><span class="n">postscript</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="n">font_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span>
+                                <span class="n">family</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">postscript</span><span class="o">.</span><span class="n">lower</span><span class="p">()):</span>
+                            <span class="n">filename</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;FcChar8 **&#39;</span><span class="p">)</span>
+                            <span class="n">matching_pattern</span> <span class="o">=</span> <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcFontMatch</span><span class="p">(</span>
+                                <span class="n">config</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+                            <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcPatternGetString</span><span class="p">(</span>
+                                <span class="n">matching_pattern</span><span class="p">,</span> <span class="sa">b</span><span class="s1">&#39;file&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+                            <span class="n">url</span> <span class="o">=</span> <span class="p">(</span>
+                                <span class="sa">u</span><span class="s1">&#39;file://&#39;</span> <span class="o">+</span>
+                                <span class="n">ffi</span><span class="o">.</span><span class="n">string</span><span class="p">(</span><span class="n">filename</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s1">&#39;Failed to load local font &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span><span class="p">,</span>
+                                <span class="n">font_name</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+                            <span class="k">continue</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">with</span> <span class="n">fetch</span><span class="p">(</span><span class="n">url_fetcher</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">result</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="s1">&#39;string&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                                <span class="n">font</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;string&#39;</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">font</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;file_obj&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                        <span class="n">LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s1">&#39;Failed to load font at &quot;</span><span class="si">%s</span><span class="s1">&quot; (</span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+                        <span class="k">continue</span>
+                    <span class="n">font_features</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="n">rules</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">):</span> <span class="n">rules</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">rules</span> <span class="ow">in</span>
+                        <span class="n">rule_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;font_variant&#39;</span><span class="p">,</span> <span class="p">[])}</span>
+                    <span class="k">if</span> <span class="s1">&#39;font_feature_settings&#39;</span> <span class="ow">in</span> <span class="n">rule_descriptors</span><span class="p">:</span>
+                        <span class="n">font_features</span><span class="p">[</span><span class="s1">&#39;font_feature_settings&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">rule_descriptors</span><span class="p">[</span><span class="s1">&#39;font_feature_settings&#39;</span><span class="p">])</span>
+                    <span class="n">features_string</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">get_font_features</span><span class="p">(</span>
+                            <span class="o">**</span><span class="n">font_features</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="n">features_string</span> <span class="o">+=</span> <span class="s1">&#39;&lt;string&gt;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&lt;/string&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                    <span class="n">fd</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">font</span><span class="p">)</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_filenames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+                    <span class="n">xml</span> <span class="o">=</span> <span class="s1">&#39;&#39;&#39;&lt;?xml version=&quot;1.0&quot;?&gt;</span>
+<span class="s1">                    &lt;!DOCTYPE fontconfig SYSTEM &quot;fonts.dtd&quot;&gt;</span>
+<span class="s1">                    &lt;fontconfig&gt;</span>
+<span class="s1">                      &lt;match target=&quot;scan&quot;&gt;</span>
+<span class="s1">                        &lt;test name=&quot;file&quot; compare=&quot;eq&quot;&gt;</span>
+<span class="s1">                          &lt;string&gt;</span><span class="si">%s</span><span class="s1">&lt;/string&gt;</span>
+<span class="s1">                        &lt;/test&gt;</span>
+<span class="s1">                        &lt;edit name=&quot;family&quot; mode=&quot;assign_replace&quot;&gt;</span>
+<span class="s1">                          &lt;string&gt;</span><span class="si">%s</span><span class="s1">&lt;/string&gt;</span>
+<span class="s1">                        &lt;/edit&gt;</span>
+<span class="s1">                        &lt;edit name=&quot;slant&quot; mode=&quot;assign_replace&quot;&gt;</span>
+<span class="s1">                          &lt;const&gt;</span><span class="si">%s</span><span class="s1">&lt;/const&gt;</span>
+<span class="s1">                        &lt;/edit&gt;</span>
+<span class="s1">                        &lt;edit name=&quot;weight&quot; mode=&quot;assign_replace&quot;&gt;</span>
+<span class="s1">                          &lt;const&gt;</span><span class="si">%s</span><span class="s1">&lt;/const&gt;</span>
+<span class="s1">                        &lt;/edit&gt;</span>
+<span class="s1">                        &lt;edit name=&quot;width&quot; mode=&quot;assign_replace&quot;&gt;</span>
+<span class="s1">                          &lt;const&gt;</span><span class="si">%s</span><span class="s1">&lt;/const&gt;</span>
+<span class="s1">                        &lt;/edit&gt;</span>
+<span class="s1">                      &lt;/match&gt;</span>
+<span class="s1">                      &lt;match target=&quot;font&quot;&gt;</span>
+<span class="s1">                        &lt;test name=&quot;file&quot; compare=&quot;eq&quot;&gt;</span>
+<span class="s1">                          &lt;string&gt;</span><span class="si">%s</span><span class="s1">&lt;/string&gt;</span>
+<span class="s1">                        &lt;/test&gt;</span>
+<span class="s1">                        &lt;edit name=&quot;fontfeatures&quot;</span>
+<span class="s1">                              mode=&quot;assign_replace&quot;&gt;</span><span class="si">%s</span><span class="s1">&lt;/edit&gt;</span>
+<span class="s1">                      &lt;/match&gt;</span>
+<span class="s1">                    &lt;/fontconfig&gt;&#39;&#39;&#39;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">filename</span><span class="p">,</span>
+                        <span class="n">rule_descriptors</span><span class="p">[</span><span class="s1">&#39;font_family&#39;</span><span class="p">],</span>
+                        <span class="n">FONTCONFIG_STYLE_CONSTANTS</span><span class="p">[</span>
+                            <span class="n">rule_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;font_style&#39;</span><span class="p">,</span> <span class="s1">&#39;normal&#39;</span><span class="p">)],</span>
+                        <span class="n">FONTCONFIG_WEIGHT_CONSTANTS</span><span class="p">[</span>
+                            <span class="n">rule_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;font_weight&#39;</span><span class="p">,</span> <span class="s1">&#39;normal&#39;</span><span class="p">)],</span>
+                        <span class="n">FONTCONFIG_STRETCH_CONSTANTS</span><span class="p">[</span>
+                            <span class="n">rule_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;font_stretch&#39;</span><span class="p">,</span> <span class="s1">&#39;normal&#39;</span><span class="p">)],</span>
+                        <span class="n">filename</span><span class="p">,</span> <span class="n">features_string</span><span class="p">)</span>
+                    <span class="n">fd</span><span class="p">,</span> <span class="n">conf_filename</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">()</span>
+                    <span class="c1"># TODO: coding is OK for &lt;test&gt; but what about &lt;edit&gt;?</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">xml</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">FILESYSTEM_ENCODING</span><span class="p">))</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_filenames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">conf_filename</span><span class="p">)</span>
+                    <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcConfigParseAndLoad</span><span class="p">(</span>
+                        <span class="n">config</span><span class="p">,</span> <span class="n">conf_filename</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">FILESYSTEM_ENCODING</span><span class="p">),</span>
+                        <span class="bp">True</span><span class="p">)</span>
+                    <span class="n">font_added</span> <span class="o">=</span> <span class="n">fontconfig</span><span class="o">.</span><span class="n">FcConfigAppFontAddFile</span><span class="p">(</span>
+                        <span class="n">config</span><span class="p">,</span> <span class="n">filename</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">FILESYSTEM_ENCODING</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">font_added</span><span class="p">:</span>
+                        <span class="c1"># TODO: we should mask local fonts with the same name</span>
+                        <span class="c1"># too as explained in Behdad&#39;s blog entry</span>
+                        <span class="k">return</span> <span class="n">filename</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Failed to load font at &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+            <span class="n">LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s1">&#39;Font-face &quot;</span><span class="si">%s</span><span class="s1">&quot; cannot be loaded&#39;</span><span class="p">,</span>
+                <span class="n">rule_descriptors</span><span class="p">[</span><span class="s1">&#39;font_family&#39;</span><span class="p">])</span>
+
+        <span class="k">def</span> <span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Clean a font configuration for a document.&quot;&quot;&quot;</span>
+            <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filenames</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+</pre></div>
+</body>
+</html>
