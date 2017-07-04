@@ -4,22 +4,24 @@ from __future__ import print_function
 import argparse
 import glob
 import os
+import re
 import signal
 import sys
 import textwrap
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="weasyprint")
 
 from backports.shutil_which import which
 from backports.shutil_get_terminal_size import get_terminal_size
-from natsort import natsorted
+from natsort import natsorted, ns
 from pygments import highlight
-from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
+from pygments.lexers import guess_lexer_for_filename
 import termcolor
 
 
 def main():
-    """
-    """
 
     # Exit on ctrl-c
     def handler(signum, frame):
@@ -36,17 +38,24 @@ def main():
     parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="input to render", nargs="+")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
+    parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     args = parser.parse_args(sys.argv[1:])
-    
+ 
     # Ensure output ends in .pdf
     output = args.output
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
 
+    # Check for size
+    size = args.size
+    if not size:
+        size = "letter landscape"
+    elif size == "A4" or size == "letter":
+        size = "{} landscape".format(args.size.strip())
+
     # Create parent directory as needed
-    output = os.path.realpath(output)
-    dirname = os.path.dirname(output)
+    dirname = os.path.dirname(os.path.realpath(output))
     if not os.path.isdir(dirname):
         while True:
             s = input("Create {}? ".format(dirname)).strip()
@@ -64,20 +73,22 @@ def main():
     if os.path.exists(output):
         while True:
             s = input("Overwrite {}? ".format(output))
-            if s.lower() in ["n", "no"]:
+            if s.lower() in ["y", "yes"]:
+                break
+            elif s.lower() in ["n", "no"]:
                 raise RuntimeError()
 
     # Check for includes
     includes = []
     if args.include:
         for i in args.include:
-            includes.append(i.replace(".", "\.").replace("|", "\|").replace("*", ".*"))
+            includes.append(re.escape(i).replace("\*", ".*"))
 
     # Check for excludes
     excludes = []
     if args.exclude:
-        for i in args.exclude:
-            excludes.append(i.replace(".", "\.").replace("|", "\|").replace("*", ".*"))
+        for x in args.exclude:
+            excludes.append(re.escape(x).replace("\*", ".*"))
 
     # Check stdin for inputs else command line
     patterns = []
@@ -86,47 +97,101 @@ def main():
     else:
         patterns = args.input
 
-    # Glob patterns lest shell (e.g., Windows) not have done so
-    inputs = []
+    # Glob patterns lest shell (e.g., Windows) not have done so, ignoring empty patterns
+    paths = []
     for pattern in patterns:
-        paths = natsorted(glob.glob(pattern))
-        inputs += paths
+        if pattern:
+            paths += natsorted(glob.glob(pattern), alg=ns.IGNORECASE)
 
-    # Queue files and directories to render
+    # Candidates to render
+    candidates = []
+    for path in paths:
+        if not os.access(path, os.R_OK):
+            raise RuntimeError("Could not read: {}".format(path))
+        if os.path.isfile(path):
+            candidates.append(path)
+        elif os.path.isdir(path):
+            files = []
+            for dirpath, _, filenames in os.walk(path):
+                for filename in filenames:
+                    files.append(os.path.join(dirpath, filename))
+            natsorted(files, alg=ns.IGNORECASE)
+            candidates += files
+        else:
+            raise RuntimeError("Unsupported: {}".format(path))
+
+    # Filter candidates
     queue = []
-    for input in inputs:
-        pass # TODO
+    for candidate in candidates:
 
-    print(inputs)
-    sys.exit()
+        # Skip implicit exclusions
+        if includes and not re.search(r"^" + r"|".join(includes) + "$", candidate):
+            continue
 
-    # Check for excludes
-    # TODO
+        # Skip explicit exclusions
+        if excludes and re.search(r"^" + r"|".join(excludes) + "$", candidate):
+            continue
 
-    # Check for inputs
-    inputs = args.input
-    if "--" in args.input:
-        inputs += sys.stdin.readlines()
+        # Skip dotfiles
+        if candidate.startswith("."):
+            continue
 
-    # Glob patterns lest shell (e.g., Windows) not have done so
-    # TODO
+        # Queue candidate for rendering
+        queue.append(candidate)
 
-    # Queue files for rendering
-    # TODO
-    queue = []
-    for input in inputs:
-        pass
+    # Render queued files
+    documents = []
+    for queued in queue:
 
-    # Render files
-    # TODO
-    for file in queue:
-        pass
+        # Open file
+        with open(queued, "rb") as file:
 
-    print(args)
+            # Read file
+            code = file.read().decode("utf-8", "ignore")
+
+            # Skip binary files
+            if "\x00" in code:
+                cprint("Skipping {} because binary...".format(queued), "yellow")
+                continue
+
+            # Highlight code unless file is empty
+            string = ""
+            if code.strip():
+                string = highlight(code, guess_lexer_for_filename(queued, code), HtmlFormatter(linenos=True, nobackground=True))
+
+            # Stylize document
+            stylesheets = [
+                    CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
+                    CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(queued.replace("'", "\'"))),
+                    CSS(string=".highlight {{ bookmark-label: 'foo'; bookmark-level: 1; }}".format(queued.replace("'", "\'"))),
+                    CSS(string="* { font-family: monospace; font-size: 10pt; }"),
+                    CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+                    CSS(string=".highlight { background: initial; }"),
+                    CSS(string=".linenos { color: #808080; }"),
+                    CSS(string=".linenos pre:after { content: '  '; }")]
+
+            # Render document
+            cprint("Rendering {}...".format(queued))
+            document = HTML(string=string).render(stylesheets=stylesheets)
+
+            # Bookmark document
+            document.pages[0].bookmarks = [(1, queued, (0, 0))]
+
+            # Buffer this document
+            documents.append(document)
+
+    # Write documents to PDF
+    # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
+    if documents:
+        pages = [page for document in documents for page in document.pages]
+        documents[0].copy(pages).write_pdf(output)
+        cprint("Rendered {}.".format(output), "green")
+    else:
+        cprint("Nothing to render.", "red")
 
 
 def cprint(text="", color=None, on_color=None, attrs=None, **kwargs):
-    """Colorizes text (and wraps to terminal's width)."""
+    """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
     columns, _ = get_terminal_size((80, 0))
@@ -145,9 +210,27 @@ def excepthook(type, value, tb):
     excepthook.ignore = False
     if type is RuntimeError and str(value):
         cprint(str(value), "yellow")
-    cprint(str(value), "yellow")
     cprint("Rendering cancelled.", "red")
 sys.excepthook = excepthook
+
+
+# Check for dependencies
+# http://weasyprint.readthedocs.io/en/latest/install.html
+try:
+    from weasyprint import CSS, HTML
+except OSError as e:
+    if "pangocairo" in str(e):
+        e = RuntimeError("Missing dependency. Install Pango.")
+        e.__cause__ = None
+        raise e
+    elif "cairo" in str(e):
+        e = RuntimeError("Missing dependency. Install cairo.")
+        e.__cause__ = None
+        raise e
+    else:
+        e = RuntimeError(str(e))
+        e.__cause__ = None
+        raise e
 
 
 if __name__ == "__main__":
