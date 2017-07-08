@@ -1,0 +1,32 @@
+language: python
+python:
+- '2.7'
+- '3.4'
+branches:
+  except: "/^v\\d/"
+install: pip install .
+script:
+- render50 -h
+- touch foo.c && render50 foo foo.c && test -f foo.pdf
+jobs:
+  include:
+  - stage: deploy
+    python: '3.4'
+    install: skip
+    before_script: skip
+    script: skip
+    deploy:
+    - provider: script
+      script: 'curl --fail --data "{ \"tag_name\": \"v$(python setup.py --version)\",
+        \"target_commitish\": \"$TRAVIS_COMMIT\", \"name\": \"v$(python setup.py --version)\"
+        }" --user bot50:$GITHUB_TOKEN https://api.github.com/repos/$TRAVIS_REPO_SLUG/releases'
+      on:
+        branch: master
+    - provider: pypi
+      user: "$PYPI_USERNAME"
+      password: "$PYPI_PASSWORD"
+      on:
+        branch: master
+notifications:
+  slack:
+    secure: TNHb+yZ1vu4ObTK/HcixElM4tdThAWXfOQCDQB+LoFRt+FAoPz08zMtLJftWBFk5eaGsjx0EZT4cGPmCIa+rTZBago6hzOQYyojVcPvKikx2WRNMLCUvl+rJ4CmDSg+D+RjueTh4aZIL1Jw+jpfsw+RteEiiiDuLOf97tTY2kYe5O9YlP3EDqNH+lJjEztD+znBn3Tl3nKdSkIOW0t12N0HtPwX0LgUVfHYhKdeZPUZy/PC+f4tS+FcjbIoyNpjDQyOOgT8GmzihJRPrBMnfJevwv841kYNsxpsHxHC26YedOsByExHIQ7ccKeMJIBh/aCMyg9P2D08zKoZxdBgRqyO7A4L6gRj+rdoYsaiffzu6DF1GF6tgyGrTcer35beXC8JkpSnPLUI28WCe9QGqiYymNHRNl4gwoRcBt9AGdHLrXywHisjzS5XRbPRi1uJVgrPmdAVX1UvqpnnbaN/m8fbIXL6VxhABhJALRVg5DZfwMkO7FPrWjiE1poSBDvoqE7sRJJU7NhSfU66gFr1ELTU66xfV9EW3+t5ogQsa67VMzGdnbFBXsD54LPt9mZbUZQf16LzoGUQrmI1lo7KUroFBO8V5afaMhYJBP8s08Crx2cuaUrSL0ncmShaBPhiAKLJmW+SfYPQVD+SiunUlLAKa1RQK/J+VNxotOr/DLCg=
