@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from __future__ import print_function
 import argparse
@@ -8,17 +8,24 @@ import re
 import signal
 import sys
 import textwrap
+import traceback
 import warnings
-
-warnings.filterwarnings("ignore", category=UserWarning, module="weasyprint")
 
 from backports.shutil_which import which
 from backports.shutil_get_terminal_size import get_terminal_size
 from natsort import natsorted, ns
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
-from pygments.lexers import guess_lexer_for_filename
+from pygments.lexers import guess_lexer, guess_lexer_for_filename
+from pygments.lexers.special import TextLexer
 import termcolor
+
+
+# require python 2.7+
+if sys.version_info < (2, 7):
+    sys.exit("You have an old version of python. Install version 2.7 or higher.")
+if sys.version_info < (3, 0):
+    input = raw_input
 
 
 def main():
@@ -32,14 +39,13 @@ def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="A command-line tool that "
                                                  "renders source code as a PDF.")
-    parser.add_argument("-r", "--recursive",
-            action="store_true",
-            help="recurse into directories")
-    parser.add_argument("output", help="file to output")
-    parser.add_argument("input", help="input to render", nargs="+")
+    parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
+    parser.add_argument("--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
+    parser.add_argument("output", help="file to output")
+    parser.add_argument("input", help="input to render", nargs="+")
     args = parser.parse_args(sys.argv[1:])
  
     # Ensure output ends in .pdf
@@ -157,14 +163,22 @@ def main():
             # Highlight code unless file is empty, using inline line numbers to avoid
             # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
             string = ""
-            if code.strip():
-                string = highlight(code, guess_lexer_for_filename(queued, code), HtmlFormatter(linenos="inline", nobackground=True))
+            if code.strip() and not args.no_color:
+                try:
+                    lexer = guess_lexer_for_filename(queued, code)
+                except:
+                    try:
+                        lexer = guess_lexer(code)
+                    except:
+                        lexer = TextLexer()
+                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+            else:
+                string = highlight(code, TextLexer(), HtmlFormatter(linenos="inline", nobackground=True))
 
             # Stylize document
             stylesheets = [
                     CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
                     CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(queued.replace("'", "\'"))),
-                    CSS(string=".highlight {{ bookmark-label: 'foo'; bookmark-level: 1; }}".format(queued.replace("'", "\'"))),
                     CSS(string="* { font-family: monospace; font-size: 10pt; }"),
                     CSS(string=HtmlFormatter().get_style_defs('.highlight')),
                     CSS(string=".highlight { background: initial; }"),
@@ -195,14 +209,15 @@ def cprint(text="", color=None, on_color=None, attrs=None, **kwargs):
     """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
-    columns, _ = get_terminal_size((80, 0))
+    columns, _ = get_terminal_size()
+    if columns == 0: columns = 80
 
     # Only python3 supports "flush" keyword argument
     if sys.version_info < (3, 0) and "flush" in kwargs:
         del kwargs["flush"]
 
     # Print text
-    termcolor.cprint(textwrap.fill(text, columns, drop_whitespace=False),
+    termcolor.cprint(textwrap.fill(text, columns, drop_whitespace=False, replace_whitespace=False),
                      color=color, on_color=on_color, attrs=attrs, **kwargs)
 
 
@@ -211,13 +226,37 @@ def excepthook(type, value, tb):
     excepthook.ignore = False
     if type is RuntimeError and str(value):
         cprint(str(value), "yellow")
+    else:
+        cprint("Sorry, something's wrong! Let sysadmins@cs50.harvard.edu know!", "yellow")
+        traceback.print_exception(type, value, tb)
     cprint("Rendering cancelled.", "red")
 sys.excepthook = excepthook
+
+
+def _inline_min_content_width(context, box, outer=True, skip_stack=None,
+                             first_line=False, is_line_start=False):
+    """Return the min-content width for an ``InlineBox``.
+    The width is calculated from the lines from ``skip_stack``. If
+    ``first_line`` is ``True``, only the first line minimum width is
+    calculated.
+    """
+    widths = weasyprint.layout.preferred.inline_line_widths(
+        context, box, outer, is_line_start, minimum=True,
+        skip_stack=skip_stack)
+
+    if first_line:
+        widths = [next(widths)]
+    else:
+        widths = list(widths)
+        widths[-1] -= weasyprint.layout.preferred.trailing_whitespace_size(context, box)
+    return weasyprint.layout.preferred.adjust(box, outer, max(widths))
 
 
 # Check for dependencies
 # http://weasyprint.readthedocs.io/en/latest/install.html
 try:
+    # Ignore warnings about outdated Cairo and Pango (on Ubuntu 14.04, at least)
+    warnings.filterwarnings("ignore", category=UserWarning, module="weasyprint")
     from weasyprint import CSS, HTML
 except OSError as e:
     if "pangocairo" in str(e):
@@ -232,6 +271,12 @@ except OSError as e:
         e = RuntimeError(str(e))
         e.__cause__ = None
         raise e
+else:
+    # Temporary until https://github.com/Kozea/WeasyPrint/milestone/7 deploys
+    import weasyprint.layout.inlines
+    weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
+    import weasyprint.layout.preferred
+    weasyprint.layout.preferred.inline_min_content_width = _inline_min_content_width
 
 
 if __name__ == "__main__":
