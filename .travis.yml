@@ -6,7 +6,7 @@ branches:
   except: "/^v\\d/"
 install: pip install .
 script:
-- render50
+- render50 -h
 - touch foo.c && render50 foo foo.c && test -f foo.pdf
 jobs:
   include:
