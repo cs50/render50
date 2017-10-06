@@ -205,14 +205,15 @@ def main():
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     if documents:
         # If we're in side-by-side mode, write two temp PDFs, then concatenate them
+        pages = [page for document in documents for page in document.pages]
+        
         if args.side:
-            pages = [page for document in documents for page in document.pages]
             documents[0].copy(pages).write_pdf('temp.pdf')
             merge_pdfs(output)
         else:
-            pages = [page for document in documents for page in document.pages]
             documents[0].copy(pages).write_pdf(output)
-            cprint("Rendered {}.".format(output), "green")
+
+        cprint("Rendered {}.".format(output), "green")
     else:
         cprint("Nothing to render.", "red")
 
