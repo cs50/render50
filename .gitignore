@@ -3,4 +3,5 @@
 !.travis.yml
 *.egg-info
 *.pdf
+!blank.pdf
 venv

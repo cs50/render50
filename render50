@@ -205,12 +205,17 @@ def main():
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     if documents:
         # If we're in side-by-side mode, write two temp PDFs, then concatenate them
-        pages = [page for document in documents for page in document.pages]
-        
         if args.side:
-            documents[0].copy(pages).write_pdf('temp.pdf')
+            # Write temp PDFs for first and second document
+            documents[0].write_pdf('temp1.pdf')
+            documents[1].write_pdf('temp2.pdf')
+
             merge_pdfs(output)
+
+            os.remove('temp1.pdf')
+            os.remove('temp2.pdf')
         else:
+            pages = [page for document in documents for page in document.pages]
             documents[0].copy(pages).write_pdf(output)
 
         cprint("Rendered {}.".format(output), "green")
@@ -219,30 +224,51 @@ def main():
 
 def merge_pdfs(output):
     """ 
-    Combines the first and second page of a temporary PDF for side-by-side rendering. 
+    Combines two temp PDFs page by page, side by side, filling in blank pages for shorter PDF side. 
     https://stackoverflow.com/questions/24580454/python-pypdf2-join-pages/34646677#34646677
-    """    
-    with open('temp.pdf', 'rb') as input_file:
-        # load input pdf
-        input_pdf = PyPDF2.PdfFileReader(input_file)
+    """
+    with open('temp1.pdf', 'rb') as temp1, open('temp2.pdf', 'rb') as temp2, open('blank.pdf', 'rb') as blank:
+        # Load input pdfs
+        input_pdf_1 = PyPDF2.PdfFileReader(temp1)
+        input_pdf_2 = PyPDF2.PdfFileReader(temp2)
+        blank_pdf = PyPDF2.PdfFileReader(blank)
 
-        # start new PyPDF2 PageObject
-        output_pdf = input_pdf.getPage(0)
+        # Determine which PDF is larger
+        temp1_pages = input_pdf_1.getNumPages()
+        temp2_pages = input_pdf_2.getNumPages()
+        pages_to_iterate = max(temp1_pages, temp2_pages)
 
-        # get second page PyPDF2 PageObject
-        second_pdf = input_pdf.getPage(1)
+        completed_pages = []
 
-        # dimensions for offset from loaded page (adding it to the right)
-        offset_x = output_pdf.mediaBox[2]
-        offset_y = 0
+        # Iterate through both PDFs, creating side-by-side pages for both. Insert blanks onto whichever side is shorter
+        for page_num in range(pages_to_iterate):
+            # Insert blanks onto left side if we've gone past temp1's page count
+            if page_num >= temp1_pages:
+                output_pdf = blank_pdf.getPage(0)
+            else:
+                output_pdf = input_pdf_1.getPage(page_num)
+            
+            # Insert blanks onto right side if we've gone past temp2's page count
+            if page_num >= temp2_pages:
+                second_pdf = blank_pdf.getPage(0)
+            else:
+                second_pdf = input_pdf_2.getPage(page_num)
 
-        # add second page to first one
-        output_pdf.mergeTranslatedPage(second_pdf, offset_x, offset_y, expand=True)
+            # Dimensions for offset from loaded page (adding it to the right)
+            offset_x = output_pdf.mediaBox[2]
+            offset_y = 0
 
-        # write finished pdf
+            # Add second page to first one
+            output_pdf.mergeTranslatedPage(second_pdf, offset_x, offset_y, expand=True)
+            completed_pages.append(output_pdf)
+
+        # Write finished pdf
         with open(output, 'wb') as out_file:
             write_pdf = PyPDF2.PdfFileWriter()
-            write_pdf.addPage(output_pdf)
+
+            for page in completed_pages:
+                write_pdf.addPage(page)
+            
             write_pdf.write(out_file)
 
 
