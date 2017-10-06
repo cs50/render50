@@ -18,6 +18,7 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.lexers.special import TextLexer
+import PyPDF2
 import termcolor
 
 
@@ -44,6 +45,7 @@ def main():
     parser.add_argument("--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
+    parser.add_argument("-y", "--side", action="store_true", help="render two files side-by-side")
     parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="input to render", nargs="+")
     args = parser.parse_args(sys.argv[1:])
@@ -52,6 +54,10 @@ def main():
     output = args.output
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
+
+    # Ensure if side-by-side mode is checked that there are two and only two input files
+    if args.side and len(args.input) is not 2:
+        raise RuntimeError("2 files not specified with -y flag; quitting!")
 
     # Check for size
     size = args.size
@@ -198,11 +204,45 @@ def main():
     # Write documents to PDF
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     if documents:
-        pages = [page for document in documents for page in document.pages]
-        documents[0].copy(pages).write_pdf(output)
-        cprint("Rendered {}.".format(output), "green")
+        # If we're in side-by-side mode, write two temp PDFs, then concatenate them
+        if args.side:
+            pages = [page for document in documents for page in document.pages]
+            documents[0].copy(pages).write_pdf('temp.pdf')
+            merge_pdfs(output)
+        else:
+            pages = [page for document in documents for page in document.pages]
+            documents[0].copy(pages).write_pdf(output)
+            cprint("Rendered {}.".format(output), "green")
     else:
         cprint("Nothing to render.", "red")
+
+def merge_pdfs(output):
+    """ 
+    Combines the first and second page of a temporary PDF for side-by-side rendering. 
+    https://stackoverflow.com/questions/24580454/python-pypdf2-join-pages/34646677#34646677
+    """    
+    with open('temp.pdf', 'rb') as input_file:
+        # load input pdf
+        input_pdf = PyPDF2.PdfFileReader(input_file)
+
+        # start new PyPDF2 PageObject
+        output_pdf = input_pdf.getPage(0)
+
+        # get second page PyPDF2 PageObject
+        second_pdf = input_pdf.getPage(1)
+
+        # dimensions for offset from loaded page (adding it to the right)
+        offset_x = output_pdf.mediaBox[2]
+        offset_y = 0
+
+        # add second page to first one
+        output_pdf.mergeTranslatedPage(second_pdf, offset_x, offset_y, expand=True)
+
+        # write finished pdf
+        with open(output, 'wb') as out_file:
+            write_pdf = PyPDF2.PdfFileWriter()
+            write_pdf.addPage(output_pdf)
+            write_pdf.write(out_file)
 
 
 def cprint(text="", color=None, on_color=None, attrs=None, **kwargs):
