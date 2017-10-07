@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
-    parser.add_argument("-y", "--side", action="store_true", help="render two files side-by-side")
+    parser.add_argument("-y", "--side-by-side", action="store_true", help="render two files side-by-side")
     parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="input to render", nargs="+")
     args = parser.parse_args(sys.argv[1:])
@@ -55,9 +55,9 @@ def main():
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
 
-    # Ensure if side-by-side mode is checked that there are two and only two input files
-    if args.side and len(args.input) is not 2:
-        raise RuntimeError("2 files not specified with -y flag; quitting!")
+    # Ensure there are two and only two input files if side-by-side specified
+    if args.side_by_side and len(args.input) != 2:
+        raise RuntimeError("Can only render 2 files side-by-side.")
 
     # Check for size
     size = args.size
@@ -65,6 +65,9 @@ def main():
         size = "letter landscape"
     elif size == "A4" or size == "letter":
         size = "{} landscape".format(args.size.strip())
+    else:
+        raise RuntimeError("Can only render 2 files side-by-side.")
+
 
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
@@ -204,8 +207,10 @@ def main():
     # Write documents to PDF
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     if documents:
+
         # If we're in side-by-side mode, write two temp PDFs, then concatenate them
-        if args.side:
+        if args.side_by_side:
+
             # Write temp PDFs for first and second document
             documents[0].write_pdf('temp1.pdf')
             documents[1].write_pdf('temp2.pdf')
@@ -242,6 +247,7 @@ def merge_pdfs(output):
 
         # Iterate through both PDFs, creating side-by-side pages for both. Insert blanks onto whichever side is shorter
         for page_num in range(pages_to_iterate):
+
             # Insert blanks onto left side if we've gone past temp1's page count
             if page_num >= temp1_pages:
                 output_pdf = blank_pdf.getPage(0)

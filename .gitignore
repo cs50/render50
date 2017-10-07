@@ -4,4 +4,5 @@
 *.egg-info
 *.pdf
 !blank.pdf
-venv
+tmp/
+venv/
