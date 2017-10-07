@@ -68,7 +68,6 @@ def main():
     else:
         raise RuntimeError("Can only render 2 files side-by-side.")
 
-
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
     if not os.path.isdir(dirname):
