@@ -2,11 +2,13 @@
 
 from __future__ import print_function
 import argparse
+import copy
 import glob
 import os
 import re
 import signal
 import sys
+import tempfile
 import textwrap
 import traceback
 import warnings
@@ -62,7 +64,12 @@ def main():
     # Check for size
     size = args.size
     if not size:
-        size = "letter landscape"
+        if args.side_by_side:
+            size = "letter portrait"
+        else:
+            size = "letter landscape"
+    elif args.side_by_side and (size == "A4" or size == "letter"):
+        size = "{} portrait".format(args.size.strip())
     elif size == "A4" or size == "letter":
         size = "{} landscape".format(args.size.strip())
     else:
@@ -157,51 +164,10 @@ def main():
     documents = []
     for queued in queue:
 
-        # Open file
-        with open(queued, "rb") as file:
-
-            # Read file
-            code = file.read().decode("utf-8", "ignore")
-
-            # Skip binary files
-            if "\x00" in code:
-                cprint("Skipping {} because binary...".format(queued), "yellow")
-                continue
-
-            # Highlight code unless file is empty, using inline line numbers to avoid
-            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-            string = ""
-            if code.strip() and not args.no_color:
-                try:
-                    lexer = guess_lexer_for_filename(queued, code)
-                except:
-                    try:
-                        lexer = guess_lexer(code)
-                    except:
-                        lexer = TextLexer()
-                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
-            else:
-                string = highlight(code, TextLexer(), HtmlFormatter(linenos="inline", nobackground=True))
-
-            # Stylize document
-            stylesheets = [
-                    CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
-                    CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(queued.replace("'", "\'"))),
-                    CSS(string="* { font-family: monospace; font-size: 10pt; }"),
-                    CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-                    CSS(string=".highlight { background: initial; }"),
-                    CSS(string=".lineno { color: #808080; }"),
-                    CSS(string=".lineno:after { content: '  '; }")]
-
-            # Render document
-            cprint("Rendering {}...".format(queued))
-            document = HTML(string=string).render(stylesheets=stylesheets)
-
-            # Bookmark document
-            document.pages[0].bookmarks = [(1, queued, (0, 0))]
-
-            # Buffer this document
-            documents.append(document)
+        # Buffer this document
+        doc = create_document(queued, size, args.no_color)
+        if doc:
+            documents.append(doc)
 
     # Write documents to PDF
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
@@ -211,13 +177,21 @@ def main():
         if args.side_by_side:
 
             # Write temp PDFs for first and second document
-            documents[0].write_pdf('temp1.pdf')
-            documents[1].write_pdf('temp2.pdf')
+            _, left_temp = tempfile.mkstemp()
+            _, right_temp = tempfile.mkstemp()
+            _, blank_temp = tempfile.mkstemp()
 
-            merge_pdfs(output)
+            documents[0].write_pdf(left_temp)
+            documents[1].write_pdf(right_temp)
 
-            os.remove('temp1.pdf')
-            os.remove('temp2.pdf')
+            # Generate and write blank PDF for filler pages
+            generated_blank_doc = generate_blank_pdf(blank_temp, size=size)
+
+            merge_pdfs(left_temp, right_temp, blank_temp, output)
+
+            os.remove(left_temp)
+            os.remove(right_temp)
+            os.remove(blank_temp)
         else:
             pages = [page for document in documents for page in document.pages]
             documents[0].copy(pages).write_pdf(output)
@@ -226,38 +200,107 @@ def main():
     else:
         cprint("Nothing to render.", "red")
 
-def merge_pdfs(output):
+
+def create_document(path=None, size='letter portrait', no_color=True, content=None):
+    """
+    Given a path, a size, and whether to color it, render a document to a PDF and return it.
+    Returns None on failure. Can be passed no arguments to create a blank PDF.
+    """
+    # Stylize document based on path or content
+    style_content = content if content else '{}'.format(path.replace("'", "\'"))
+    stylesheets = [
+            CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
+            CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(style_content)),
+            CSS(string="* { font-family: monospace; font-size: 10pt; }"),
+            CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+            CSS(string=".highlight { background: initial; }"),
+            CSS(string=".lineno { color: #808080; }"),
+            CSS(string=".lineno:after { content: '  '; }")]
+
+    # Generate PDF from content if no path to read from is specified
+    if not path:
+        # Render document
+        cprint("Rendering document with content: '{}'".format(content))
+        document = HTML(string=content).render(stylesheets=stylesheets)
+
+        return document
+    else:
+        # Open file
+        with open(path, "rb") as file:
+
+            # Read file unless content is pre-specified
+            code = file.read().decode("utf-8", "ignore") if not content else content
+
+            # Skip binary files
+            if "\x00" in code:
+                cprint("Skipping {} because binary...".format(path), "yellow")
+                return None
+
+            # Highlight code unless file is empty, using inline line numbers to avoid
+            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+            string = ""
+            if code.strip() and not no_color:
+                try:
+                    lexer = guess_lexer_for_filename(path, code)
+                except:
+                    try:
+                        lexer = guess_lexer(code)
+                    except:
+                        lexer = TextLexer()
+                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+            else:
+                string = highlight(code, TextLexer(), HtmlFormatter(linenos="inline", nobackground=True))
+
+            # Render document
+            cprint("Rendering {}...".format(path))
+            document = HTML(string=string).render(stylesheets=stylesheets)
+
+            # Bookmark document
+            document.pages[0].bookmarks = [(1, path, (0, 0))]
+
+            return document
+
+
+def generate_blank_pdf(path, size='letter potrait'):
+    """
+    Generates a blank PDF document and then writes it to a specified path.
+    """
+    blank_doc = create_document(content=' ', size=size)
+    blank_doc.write_pdf(path)
+
+
+def merge_pdfs(left_path, right_path, blank_path, output):
     """ 
     Combines two temp PDFs page by page, side by side, filling in blank pages for shorter PDF side. 
     https://stackoverflow.com/questions/24580454/python-pypdf2-join-pages/34646677#34646677
     """
-    with open('temp1.pdf', 'rb') as temp1, open('temp2.pdf', 'rb') as temp2, open('blank.pdf', 'rb') as blank:
+    with open(left_path, "rb") as left_file, open(right_path, "rb") as right_file, open(blank_path, "rb") as blank_file:
         # Load input pdfs
-        input_pdf_1 = PyPDF2.PdfFileReader(temp1)
-        input_pdf_2 = PyPDF2.PdfFileReader(temp2)
-        blank_pdf = PyPDF2.PdfFileReader(blank)
+        left_pdf = PyPDF2.PdfFileReader(left_file)
+        right_pdf = PyPDF2.PdfFileReader(right_file)
+        blank_pdf = PyPDF2.PdfFileReader(blank_file)
 
         # Determine which PDF is larger
-        temp1_pages = input_pdf_1.getNumPages()
-        temp2_pages = input_pdf_2.getNumPages()
-        pages_to_iterate = max(temp1_pages, temp2_pages)
+        left_pages = left_pdf.getNumPages()
+        right_pages = right_pdf.getNumPages()
+        pages_to_iterate = max(left_pages, right_pages)
 
         completed_pages = []
 
         # Iterate through both PDFs, creating side-by-side pages for both. Insert blanks onto whichever side is shorter
         for page_num in range(pages_to_iterate):
 
-            # Insert blanks onto left side if we've gone past temp1's page count
-            if page_num >= temp1_pages:
-                output_pdf = blank_pdf.getPage(0)
+            # Insert blanks onto left side if we've gone past left PDF's page count
+            if page_num >= left_pages:
+                output_pdf = copy.copy(blank_pdf.getPage(0))
             else:
-                output_pdf = input_pdf_1.getPage(page_num)
+                output_pdf = copy.copy(left_pdf.getPage(page_num))
             
-            # Insert blanks onto right side if we've gone past temp2's page count
-            if page_num >= temp2_pages:
-                second_pdf = blank_pdf.getPage(0)
+            # Insert blanks onto right side if we've gone past right PDF's page count
+            if page_num >= right_pages:
+                second_pdf = copy.copy(blank_pdf.getPage(0))
             else:
-                second_pdf = input_pdf_2.getPage(page_num)
+                second_pdf = copy.copy(right_pdf.getPage(page_num))
 
             # Dimensions for offset from loaded page (adding it to the right)
             offset_x = output_pdf.mediaBox[2]
