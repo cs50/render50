@@ -187,7 +187,7 @@ def main():
             # Generate and write blank PDF for filler pages
             generated_blank_doc = generate_blank_pdf(blank_temp, size=size)
 
-            merge_pdfs(left_temp, right_temp, blank_temp, output)
+            merge_pdfs(left_temp, right_temp, blank_temp, args.size, output)
 
             os.remove(left_temp)
             os.remove(right_temp)
@@ -269,7 +269,7 @@ def generate_blank_pdf(path, size='letter potrait'):
     blank_doc.write_pdf(path)
 
 
-def merge_pdfs(left_path, right_path, blank_path, output):
+def merge_pdfs(left_path, right_path, blank_path, size, output):
     """ 
     Combines two temp PDFs page by page, side by side, filling in blank pages for shorter PDF side. 
     https://stackoverflow.com/questions/24580454/python-pypdf2-join-pages/34646677#34646677
@@ -308,6 +308,11 @@ def merge_pdfs(left_path, right_path, blank_path, output):
 
             # Add second page to first one
             output_pdf.mergeTranslatedPage(second_pdf, offset_x, offset_y, expand=True)
+
+            # Get proper scaling size based on input
+            scale_x, scale_y = (792, 612) if size == 'letter' else (841.68, 595.44)
+            output_pdf.scaleTo(scale_x, scale_y)
+            
             completed_pages.append(output_pdf)
 
         # Write finished pdf
