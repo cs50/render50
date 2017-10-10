@@ -201,7 +201,7 @@ def main():
         cprint("Nothing to render.", "red")
 
 
-def create_document(path=None, size='letter portrait', no_color=True, content=None):
+def create_document(path=None, size="letter portrait", no_color=True, content=None):
     """
     Given a path, a size, and whether to color it, render a document to a PDF and return it.
     Returns None on failure. Can be passed no arguments to create a blank PDF.
@@ -261,7 +261,7 @@ def create_document(path=None, size='letter portrait', no_color=True, content=No
             return document
 
 
-def generate_blank_pdf(path, size='letter potrait'):
+def generate_blank_pdf(path, size="letter potrait"):
     """
     Generates a blank PDF document and then writes it to a specified path.
     """
@@ -310,13 +310,13 @@ def merge_pdfs(left_path, right_path, blank_path, size, output):
             output_pdf.mergeTranslatedPage(second_pdf, offset_x, offset_y, expand=True)
 
             # Get proper scaling size based on input
-            scale_x, scale_y = (792, 612) if size == 'letter' else (841.68, 595.44)
+            scale_x, scale_y = (792, 612) if size == "letter" else (841.68, 595.44)
             output_pdf.scaleTo(scale_x, scale_y)
             
             completed_pages.append(output_pdf)
 
         # Write finished pdf
-        with open(output, 'wb') as out_file:
+        with open(output, "wb") as out_file:
             write_pdf = PyPDF2.PdfFileWriter()
 
             for page in completed_pages:
