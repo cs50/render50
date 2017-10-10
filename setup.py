@@ -10,7 +10,7 @@ setup(
         "Topic :: Utilities"
     ],
     description="This is render50, with which you can render source code as PDFs.",
-    install_requires=["backports.shutil_get_terminal_size", "backports.shutil_which", "natsort", "Pygments", "six>=1.10.0", "termcolor", "WeasyPrint"],
+    install_requires=["backports.shutil_get_terminal_size", "backports.shutil_which", "natsort", "Pygments", "PyPDF2", "six>=1.10.0", "termcolor", "WeasyPrint"],
     keywords=["render", "render50"],
     name="render50",
     scripts=["render50"],
