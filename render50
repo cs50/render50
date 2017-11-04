@@ -119,16 +119,16 @@ def main():
         size = "{}px {}px".format(width, height)
 
         # Render lefthand input
-        _, filename0 = mkstemp(suffix=".pdf")
-        write(filename0, [render(args.input[0], color=not args.no_color, size=size)])
+        fd0, filename0 = mkstemp()
+        write(filename0, [render(args.input[0], color=not args.no_color, size=size)], False)
 
         # Render righthand input
-        _, filename1 = mkstemp(suffix=".pdf")
-        write(filename1, [render(args.input[1], color=not args.no_color, size=size)])
+        fd1, filename1 = mkstemp()
+        write(filename1, [render(args.input[1], color=not args.no_color, size=size)], False)
 
         # Render blank input
-        _, filename2 = mkstemp(suffix=".pdf")
-        write(filename2, [blank(size)])
+        fd2, filename2 = mkstemp()
+        write(filename2, [blank(size)], False)
 
         # Concatenate files side by side
         pdf = PdfFileWriter()
@@ -139,19 +139,30 @@ def main():
             pdf1 = PdfFileReader(file1)
             pdf2 = PdfFileReader(file2)
 
-            # Concatenate pages side by side
+            # Concatenate pages
             for i in range(max(pdf0.getNumPages(), pdf1.getNumPages())):
 
+                # Copy pages
                 left = copy(pdf0.getPage(i)) if i < pdf0.getNumPages() else copy(pdf2.getPage(0))
                 right = copy(pdf1.getPage(i)) if i < pdf1.getNumPages() else copy(pdf2.getPage(0))
 
+                # Merge pages
                 left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
 
+                # Add pages to output
                 pdf.addPage(left)
 
-        with open(output, "wb") as file:
-            pdf.write(file)
+            # Ouput PDF
+            with open(output, "wb") as file:
+                pdf.write(file)
 
+        # Remove temporary files
+        os.close(fd0), os.remove(filename0)
+        os.close(fd1), os.remove(filename1)
+        os.close(fd2), os.remove(filename2)
+
+        # Rendered
+        cprint("Rendered {}.".format(output), "green")
         sys.exit(0)
 
     # Check for includes
@@ -218,26 +229,17 @@ def main():
    # Render queued files
     documents = []
     for queued in queue:
-        cprint("Rendering {}...".format(queued), end="")
         document = render(queued, color=not args.no_color, size=size)
         if document:
-            cprint("\033[2K", end="\r")
-            cprint("Rendered {}.".format(queued))
             documents.append(document)
-        else:
-            cprint("\033[2K", end="\r")
-            cprint("Skipped {} because unsupported.".format(queued), "yellow")
 
-    if documents:
-        write(output, documents)
-        cprint("Rendered {}.".format(output), "green")
-    else:
-        cprint("Nothing to render.", "red")
+    # Write rendered files
+    write(output, documents)
 
 
 def blank(size):
     """Render blank page of specified size."""
-    return HTML(string="").render(stylesheets=[CSS(string="@page {{ size: {}; }}".format(size.replace(";", "\;")))])
+    return HTML(string="BLANK").render(stylesheets=[CSS(string="@page {{ size: {}; }}".format(size.replace(";", "\;")))])
 
 
 def cancel(code=0):
@@ -278,6 +280,7 @@ def render(filename, size, color=True):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Open file
+    cprint("Rendering {}...".format(filename), end="")
     with open(filename, "rb") as file:
 
         # Read file
@@ -285,6 +288,8 @@ def render(filename, size, color=True):
 
         # Check whether binary file
         if "\x00" in code:
+            cprint("\033[2K", end="\r")
+            cprint("Skipped {} because binary.".format(filename), "yellow")
             return None
 
         # Highlight code unless file is empty, using inline line numbers to avoid
@@ -320,18 +325,26 @@ def render(filename, size, color=True):
         # Bookmark document
         document.pages[0].bookmarks = [(1, filename, (0, 0))]
 
-        # Rendered
-        return document
+    # Rendered
+    cprint("\033[2K", end="\r")
+    cprint("Rendered {}.".format(filename))
+    return document
 
 
-def write(output, documents):
+def write(output, documents, echo=True):
     """
     Write documents to output as PDF.
     
     https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     """
-    pages = [page for document in documents for page in document.pages]
-    documents[0].copy(pages).write_pdf(output)
+    if documents:
+        pages = [page for document in documents for page in document.pages]
+        documents[0].copy(pages).write_pdf(output)
+        if echo:
+            cprint("Rendered {}.".format(output), "green")
+    else:
+        if echo:
+            cprint("Nothing to render.", "red")
 
 
 # Check for dependencies
