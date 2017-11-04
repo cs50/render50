@@ -254,7 +254,7 @@ def render(filename, size, color=True):
             CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(
                 size.replace(";", "\;"))),
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(filename.replace("'", "\'"))),
-            CSS(string="* { font-family: monospace; font-size: 10pt; }"),
+            CSS(string="* { font-family: monospace; font-size: 10pt; white-space: pre-wrap; }"),
             CSS(string=HtmlFormatter().get_style_defs('.highlight')),
             CSS(string=".highlight { background: initial; }"),
             CSS(string=".lineno { color: #808080; }"),
