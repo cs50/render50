@@ -15,11 +15,14 @@ import warnings
 
 from backports.shutil_which import which
 from backports.shutil_get_terminal_size import get_terminal_size
+from copy import copy
 from natsort import natsorted, ns
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.lexers.special import TextLexer
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from tempfile import mkstemp
 import termcolor
 
 
@@ -78,14 +81,9 @@ def main():
             elif s.lower() in ["n", "no"]:
                 cancel()
 
-    # Determine size
-    # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
-    if not args.size:
-        size = "letter landscape"
-    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
-        size = "{} landscape".format(args.size)
-    else:
-        size = args.size.strip()
+    # Check whether side-by-side
+    if args.side_by_side and len(args.input) != 2:
+        raise RuntimeError("Can only render two files side by side.")
 
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
@@ -101,6 +99,60 @@ def main():
                     e = RuntimeError("Could not create {}.".format(dirname))
                     e.__cause__ = None
                     raise e
+
+    # Determine size
+    # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
+    if not args.size:
+        size = "letter landscape"
+    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
+        size = "{} landscape".format(args.size)
+    else:
+        size = args.size.strip()
+
+    # Only render two files, side by side
+    if args.side_by_side:
+
+        # Halve width
+        document = blank(size)
+        width = int(document.pages[0].width / 2)
+        height = int(document.pages[0].height)
+        size = "{}px {}px".format(width, height)
+
+        # Render lefthand input
+        _, filename0 = mkstemp(suffix=".pdf")
+        write(filename0, [render(args.input[0], color=not args.no_color, size=size)])
+
+        # Render righthand input
+        _, filename1 = mkstemp(suffix=".pdf")
+        write(filename1, [render(args.input[1], color=not args.no_color, size=size)])
+
+        # Render blank input
+        _, filename2 = mkstemp(suffix=".pdf")
+        write(filename2, [blank(size)])
+
+        # Concatenate files side by side
+        pdf = PdfFileWriter()
+        with open(filename0, "rb") as file0, open(filename1, "rb") as file1, open(filename2, "rb") as file2:
+
+            # Read files
+            pdf0 = PdfFileReader(file0)
+            pdf1 = PdfFileReader(file1)
+            pdf2 = PdfFileReader(file2)
+
+            # Concatenate pages side by side
+            for i in range(max(pdf0.getNumPages(), pdf1.getNumPages())):
+
+                left = copy(pdf0.getPage(i)) if i < pdf0.getNumPages() else copy(pdf2.getPage(0))
+                right = copy(pdf1.getPage(i)) if i < pdf1.getNumPages() else copy(pdf2.getPage(0))
+
+                left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
+
+                pdf.addPage(left)
+
+        with open(output, "wb") as file:
+            pdf.write(file)
+
+        sys.exit(0)
 
     # Check for includes
     includes = []
@@ -163,7 +215,7 @@ def main():
         # Queue candidate for rendering
         queue.append(candidate)
 
-    # Render queued files
+   # Render queued files
     documents = []
     for queued in queue:
         cprint("Rendering {}...".format(queued), end="")
@@ -176,14 +228,16 @@ def main():
             cprint("\033[2K", end="\r")
             cprint("Skipped {} because unsupported.".format(queued), "yellow")
 
-    # Write documents to PDF
-    # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     if documents:
-        pages = [page for document in documents for page in document.pages]
-        documents[0].copy(pages).write_pdf(output)
+        write(output, documents)
         cprint("Rendered {}.".format(output), "green")
     else:
         cprint("Nothing to render.", "red")
+
+
+def blank(size):
+    """Render blank page of specified size."""
+    return HTML(string="").render(stylesheets=[CSS(string="@page {{ size: {}; }}".format(size.replace(";", "\;")))])
 
 
 def cancel(code=0):
@@ -221,7 +275,7 @@ sys.excepthook = excepthook
 
 
 def render(filename, size, color=True):
-    """Render file with filename as HTML page(s) of specified size"""
+    """Render file with filename as HTML page(s) of specified size."""
 
     # Open file
     with open(filename, "rb") as file:
@@ -268,6 +322,16 @@ def render(filename, size, color=True):
 
         # Rendered
         return document
+
+
+def write(output, documents):
+    """
+    Write documents to output as PDF.
+    
+    https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
+    """
+    pages = [page for document in documents for page in document.pages]
+    documents[0].copy(pages).write_pdf(output)
 
 
 # Check for dependencies
