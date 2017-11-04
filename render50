@@ -4,10 +4,12 @@ from __future__ import print_function
 import argparse
 import glob
 import os
+import pkg_resources
 import re
 import signal
 import sys
 import textwrap
+import time
 import traceback
 import warnings
 
@@ -27,6 +29,14 @@ if sys.version_info < (2, 7):
 if sys.version_info < (3, 0):
     input = raw_input
 
+# Get version
+try:
+    d = pkg_resources.get_distribution("render50")
+except pkg_resources.DistributionNotFound:
+    __version__ = "UNKNOWN"
+else:
+    __version__ = d.version
+
 
 def main():
 
@@ -44,6 +54,8 @@ def main():
     parser.add_argument("--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
+    parser.add_argument("-V", "--version", action="version", version="%(prog)s {}".format(__version__))
+    parser.add_argument("-y", "--side-by-side", action="store_true", help="render two files side-by-side")
     parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="input to render", nargs="+")
     args = parser.parse_args(sys.argv[1:])
@@ -53,12 +65,14 @@ def main():
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
 
-    # Check for size
-    size = args.size
-    if not size:
+    # Determine size
+    # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
+    if not args.size:
         size = "letter landscape"
-    elif size == "A4" or size == "letter":
-        size = "{} landscape".format(args.size.strip())
+    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
+        size = "{} landscape".format(args.size)
+    else:
+        size = args.size.strip()
 
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
@@ -148,52 +162,15 @@ def main():
     # Render queued files
     documents = []
     for queued in queue:
-
-        # Open file
-        with open(queued, "rb") as file:
-
-            # Read file
-            code = file.read().decode("utf-8", "ignore")
-
-            # Skip binary files
-            if "\x00" in code:
-                cprint("Skipping {} because binary...".format(queued), "yellow")
-                continue
-
-            # Highlight code unless file is empty, using inline line numbers to avoid
-            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-            string = ""
-            if code.strip() and not args.no_color:
-                try:
-                    lexer = guess_lexer_for_filename(queued, code)
-                except:
-                    try:
-                        lexer = guess_lexer(code)
-                    except:
-                        lexer = TextLexer()
-                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
-            else:
-                string = highlight(code, TextLexer(), HtmlFormatter(linenos="inline", nobackground=True))
-
-            # Stylize document
-            stylesheets = [
-                    CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
-                    CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(queued.replace("'", "\'"))),
-                    CSS(string="* { font-family: monospace; font-size: 10pt; }"),
-                    CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-                    CSS(string=".highlight { background: initial; }"),
-                    CSS(string=".lineno { color: #808080; }"),
-                    CSS(string=".lineno:after { content: '  '; }")]
-
-            # Render document
-            cprint("Rendering {}...".format(queued))
-            document = HTML(string=string).render(stylesheets=stylesheets)
-
-            # Bookmark document
-            document.pages[0].bookmarks = [(1, queued, (0, 0))]
-
-            # Buffer this document
+        cprint("Rendering {}...".format(queued), end="")
+        document = render(queued, color=not args.no_color, size=size)
+        if document:
+            cprint("\033[2K", end="\r")
+            cprint("Rendered {}.".format(queued))
             documents.append(document)
+        else:
+            cprint("\033[2K", end="\r")
+            cprint("Skipped {} because unsupported.".format(queued), "yellow")
 
     # Write documents to PDF
     # https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
@@ -205,20 +182,17 @@ def main():
         cprint("Nothing to render.", "red")
 
 
-def cprint(text="", color=None, on_color=None, attrs=None, **kwargs):
+def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
     columns, _ = get_terminal_size()
     if columns == 0: columns = 80
 
-    # Only python3 supports "flush" keyword argument
-    if sys.version_info < (3, 0) and "flush" in kwargs:
-        del kwargs["flush"]
-
-    # Print text
+    # Print text, flushing output
     termcolor.cprint(textwrap.fill(text, columns, drop_whitespace=False, replace_whitespace=False),
-                     color=color, on_color=on_color, attrs=attrs, **kwargs)
+                     color=color, on_color=on_color, attrs=attrs, end=end)
+    sys.stdout.flush()
 
 
 def excepthook(type, value, tb):
@@ -233,23 +207,52 @@ def excepthook(type, value, tb):
 sys.excepthook = excepthook
 
 
-def _inline_min_content_width(context, box, outer=True, skip_stack=None,
-                             first_line=False, is_line_start=False):
-    """Return the min-content width for an ``InlineBox``.
-    The width is calculated from the lines from ``skip_stack``. If
-    ``first_line`` is ``True``, only the first line minimum width is
-    calculated.
-    """
-    widths = weasyprint.layout.preferred.inline_line_widths(
-        context, box, outer, is_line_start, minimum=True,
-        skip_stack=skip_stack)
+def render(filename, size, color=True):
+    """Render file with filename as HTML page(s) of specified size"""
 
-    if first_line:
-        widths = [next(widths)]
-    else:
-        widths = list(widths)
-        widths[-1] -= weasyprint.layout.preferred.trailing_whitespace_size(context, box)
-    return weasyprint.layout.preferred.adjust(box, outer, max(widths))
+    # Open file
+    with open(filename, "rb") as file:
+
+        # Read file
+        code = file.read().decode("utf-8", "ignore")
+
+        # Check whether binary file
+        if "\x00" in code:
+            return None
+
+        # Highlight code unless file is empty, using inline line numbers to avoid
+        # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+        string = ""
+        if code.strip() and color:
+            try:
+                lexer = guess_lexer_for_filename(filename, code)
+            except:
+                try:
+                    lexer = guess_lexer(code)
+                except:
+                    lexer = TextLexer()
+            string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+        else:
+            string = highlight(code, TextLexer(), HtmlFormatter(linenos="inline", nobackground=True))
+
+        # Stylize document
+        stylesheets = [
+                CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(size.replace(";", "\;"))),
+                CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(filename.replace("'", "\'"))),
+                CSS(string="* { font-family: monospace; font-size: 10pt; }"),
+                CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+                CSS(string=".highlight { background: initial; }"),
+                CSS(string=".lineno { color: #808080; }"),
+                CSS(string=".lineno:after { content: '  '; }")]
+
+        # Render document
+        document = HTML(string=string).render(stylesheets=stylesheets)
+
+        # Bookmark document
+        document.pages[0].bookmarks = [(1, filename, (0, 0))]
+
+        # Rendered
+        return document
 
 
 # Check for dependencies
@@ -271,12 +274,6 @@ except OSError as e:
         e = RuntimeError(str(e))
         e.__cause__ = None
         raise e
-else:
-    # Temporary until https://github.com/Kozea/WeasyPrint/milestone/7 deploys
-    import weasyprint.layout.inlines
-    weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
-    import weasyprint.layout.preferred
-    weasyprint.layout.preferred.inline_min_content_width = _inline_min_content_width
 
 
 if __name__ == "__main__":
