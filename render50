@@ -65,6 +65,15 @@ def main():
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
 
+    # Prompt whether to overwrite file as needed
+    if os.path.exists(output):
+        while True:
+            s = input("Overwrite {}? ".format(output))
+            if s.lower() in ["y", "yes"]:
+                break
+            elif s.lower() in ["n", "no"]:
+                cancel()
+
     # Determine size
     # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
     if not args.size:
@@ -80,7 +89,7 @@ def main():
         while True:
             s = input("Create {}? ".format(dirname)).strip()
             if s.lower() in ["n", "no"]:
-                raise RuntimeError()
+                cancel()
             elif s.lower() in ["y", "yes"]:
                 try:
                     os.makedirs(dirname)
@@ -88,15 +97,6 @@ def main():
                     e = RuntimeError("Could not create {}.".format(dirname))
                     e.__cause__ = None
                     raise e
-
-    # Prompt whether to overwrite file as needed
-    if os.path.exists(output):
-        while True:
-            s = input("Overwrite {}? ".format(output))
-            if s.lower() in ["y", "yes"]:
-                break
-            elif s.lower() in ["n", "no"]:
-                raise RuntimeError()
 
     # Check for includes
     includes = []
@@ -182,6 +182,12 @@ def main():
         cprint("Nothing to render.", "red")
 
 
+def cancel(code=0):
+    """Report cancellation, exiting with code"""
+    cprint("Rendering cancelled.", "red")
+    sys.exit(code)
+
+
 def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
@@ -203,7 +209,9 @@ def excepthook(type, value, tb):
     else:
         cprint("Sorry, something's wrong! Let sysadmins@cs50.harvard.edu know!", "yellow")
         traceback.print_exception(type, value, tb)
-    cprint("Rendering cancelled.", "red")
+    cancel(1)
+
+
 sys.excepthook = excepthook
 
 
