@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import re
 import sys
+import requests
 import termcolor
 
 from signal import SIGINT, signal
@@ -196,15 +197,15 @@ def main():
     # Glob patterns lest shell (e.g., Windows) not have done so, ignoring empty patterns
     paths = []
     for pattern in patterns:
+        if pattern.startswith(("http", "https")):
+            paths += [pattern]
         if pattern:
             paths += natsorted(glob(pattern), alg=ns.IGNORECASE)
 
     # Candidates to render
     candidates = []
     for path in paths:
-        if not os.access(path, os.R_OK):
-            raise RuntimeError("Could not read {}.".format(path))
-        if os.path.isfile(path):
+        if os.path.isfile(path) or path.startswith(("http", "https")):
             candidates.append(path)
         elif os.path.isdir(path):
             files = []
@@ -228,14 +229,10 @@ def main():
         if excludes and re.search(r"^" + r"|".join(excludes) + "$", candidate):
             continue
 
-        # Skip dotfiles
-        if os.path.basename(candidate).startswith("."):
-            continue
-
         # Queue candidate for rendering
         queue.append(candidate)
 
-   # Render queued files
+    # Render queued files
     documents = []
     for queued in queue:
         document = render(queued, color=not args.no_color, size=size)
@@ -288,67 +285,83 @@ sys.excepthook = excepthook
 def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
-    # Open file
+    # Rendering
     cprint("Rendering {}...".format(filename), end="")
-    try: 
-        with open(filename, "rb") as file:
 
-            # Read file
-            code = file.read().decode("utf-8", "ignore")
+    # Check if URL
+    if filename.startswith(("http", "https")):
 
-            # Check whether binary file
-            if "\x00" in code:
-                cprint("\033[2K", end="\r")
-                cprint("Could not render {} because binary.".format(filename), "yellow")
-                return None
+        # Get from raw.githubusercontent.com
+        matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
+        if matches:
+            filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
 
-            # Highlight code unless file is empty, using inline line numbers to avoid
-            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-            string = ""
-            if code.strip() and color:
-                try:
-                    lexer = guess_lexer_for_filename(filename, code)
-                except:
-                    try:
-                        lexer = guess_lexer(code)
-                    except:
-                        lexer = TextLexer()
-                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
-            else:
-                string = highlight(code, TextLexer(), HtmlFormatter(
-                    linenos="inline", nobackground=True))
-
-            # Stylize document
-            stylesheets = [
-                CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
-                CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
-                    filename.replace("'", "\'"))),
-                CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; white-space: pre-wrap; }}".format(fontSize)),
-                CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-                CSS(string=".highlight { background: initial; }"),
-                CSS(string=".lineno { color: #808080; }"),
-                CSS(string=".lineno:after { content: '  '; }")]
-
-            # Render document
-            document = HTML(string=string).render(stylesheets=stylesheets)
-
-            # Bookmark document
-            document.pages[0].bookmarks = [(1, filename, (0, 0))]
-
-        # Rendered
-        cprint("\033[2K", end="\r")
-        cprint("Rendered {}.".format(filename))
-        return document
-
-    # Check for errors
-    except Exception as e:
-        cprint("\033[2K", end="\r")
-        if type(e) is FileNotFoundError:
-            e = RuntimeError("Could not find {}.".format(filename))
+        # Get file
+        req = requests.get(filename)
+        if req.status_code == 200:
+            code = req.text
         else:
-            e = RuntimeError("Could not read {}.".format(filename))
-        e.__cause__ = None
+            cprint("\033[2K", end="\r")
+            raise RuntimeError("Could not GET {}.".format(filename))
+
+    # Read file
+    else:
+        try: 
+            file = open(filename, "rb")
+            code = file.read().decode("utf-8", "ignore")
+            file.close()
+        except Exception as e:
+            cprint("\033[2K", end="\r")
+            if type(e) is FileNotFoundError:
+                e = RuntimeError("Could not find {}.".format(filename))
+            else:
+                e = RuntimeError("Could not read {}.".format(filename))
+            e.__cause__ = None
         raise e
+
+    # Check whether binary file
+    if "\x00" in code:
+        cprint("\033[2K", end="\r")
+        cprint("Could not render {} because binary.".format(filename), "yellow")
+        return None
+
+    # Highlight code unless file is empty, using inline line numbers to avoid
+    # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+    string = ""
+    if code.strip() and color:
+        try:
+            lexer = guess_lexer_for_filename(filename, code)
+        except:
+            try:
+                lexer = guess_lexer(code)
+            except:
+                lexer = TextLexer()
+        string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+    else:
+        string = highlight(code, TextLexer(), HtmlFormatter(
+            linenos="inline", nobackground=True))
+
+    # Stylize document
+    stylesheets = [
+        CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
+        CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
+            filename.replace("'", "\'"))),
+        CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; white-space: pre-wrap; }}".format(fontSize)),
+        CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+        CSS(string=".highlight { background: initial; }"),
+        CSS(string=".lineno { color: #808080; }"),
+        CSS(string=".lineno:after { content: '  '; }")]
+
+    # Render document
+    document = HTML(string=string).render(stylesheets=stylesheets)
+
+    # Bookmark document
+    document.pages[0].bookmarks = [(1, filename, (0, 0))]
+
+    # Rendered
+    cprint("\033[2K", end="\r")
+    cprint("Rendered {}.".format(filename))
+    return document
 
 
 def write(output, documents, echo=True):
