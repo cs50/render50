@@ -2,5 +2,5 @@
 
 int main(void)
 {
-    printf("bar");
+    printf("bar"); // this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment, this is a long comment
 }
