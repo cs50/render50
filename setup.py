@@ -15,5 +15,5 @@ setup(
     name="render50",
     scripts=["render50"],
     url="https://github.com/cs50/render50",
-    version="2.1.0"
+    version="2.1.1"
 )

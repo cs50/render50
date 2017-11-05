@@ -56,13 +56,13 @@ def main():
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
+    parser.add_argument("-O", "--output", help="file to output", required=True)
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-V", "--version", action="version",
                         version="%(prog)s {}".format(__version__))
     parser.add_argument("-y", "--side-by-side", action="store_true",
                         help="render two inputs side-by-side")
-    parser.add_argument("output", help="file to output")
     parser.add_argument("input", help="file or URL to render", nargs="+")
     args = parser.parse_args(sys.argv[1:])
 
