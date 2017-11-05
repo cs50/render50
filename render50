@@ -121,13 +121,19 @@ def main():
 
         # Render lefthand input
         fd0, filename0 = mkstemp()
-        write(filename0, [render(args.input[0], color=not args.no_color,
-                                 fontSize="8pt", margin=".5in .25in .5in .5in", size=size)], False)
+        document = render(args.input[0], color=not args.no_color,
+                          fontSize="8pt", margin=".5in .25in .5in .5in", size=size)
+        if not document:
+            cancel(1)
+        write(filename0, [document], False)
 
         # Render righthand input
         fd1, filename1 = mkstemp()
-        write(filename1, [render(args.input[1], color=not args.no_color,
-                                 fontSize="8pt", margin=".5in .5in .5in .25in", size=size)], False)
+        document = render(args.input[1], color=not args.no_color,
+                          fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
+        if not document:
+            cancel(1)
+        write(filename1, [document], False)
 
         # Render blank input
         fd2, filename2 = mkstemp()
@@ -293,7 +299,7 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
             # Check whether binary file
             if "\x00" in code:
                 cprint("\033[2K", end="\r")
-                cprint("Skipped {} because binary.".format(filename), "yellow")
+                cprint("Could not render {} because binary.".format(filename), "yellow")
                 return None
 
             # Highlight code unless file is empty, using inline line numbers to avoid
