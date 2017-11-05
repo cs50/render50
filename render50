@@ -317,7 +317,7 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
             else:
                 e = RuntimeError("Could not read {}.".format(filename))
             e.__cause__ = None
-        raise e
+            raise e
 
     # Check whether binary file
     if "\x00" in code:
