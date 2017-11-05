@@ -1,21 +1,17 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-import argparse
-import glob
 import os
-import pkg_resources
 import re
-import signal
 import sys
-import textwrap
-import time
-import traceback
-import warnings
+import termcolor
 
-from backports.shutil_which import which
+from signal import SIGINT, signal
+from pkg_resources import DistributionNotFound, get_distribution
+from argparse import ArgumentParser
 from backports.shutil_get_terminal_size import get_terminal_size
 from copy import copy
+from glob import glob
 from natsort import natsorted, ns
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
@@ -23,7 +19,9 @@ from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.lexers.special import TextLexer
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from tempfile import mkstemp
-import termcolor
+from textwrap import fill
+from traceback import print_exception
+from warnings import filterwarnings
 
 
 # require python 2.7+
@@ -34,8 +32,8 @@ if sys.version_info < (3, 0):
 
 # Get version
 try:
-    d = pkg_resources.get_distribution("render50")
-except pkg_resources.DistributionNotFound:
+    d = get_distribution("render50")
+except DistributionNotFound:
     __version__ = "UNKNOWN"
 else:
     __version__ = d.version
@@ -45,14 +43,14 @@ def main():
 
     # Exit on ctrl-c
     def handler(signum, frame):
-        print("")
-        sys.exit(1)
+        cprint("")
+        cancel(1)
 
     # Register handler
-    signal.signal(signal.SIGINT, handler)
+    signal(SIGINT, handler)
 
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="A command-line tool that "
+    parser = ArgumentParser(description="A command-line tool that "
                                                  "renders source code as a PDF.")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
@@ -82,8 +80,11 @@ def main():
                 cancel()
 
     # Check whether side-by-side
-    if args.side_by_side and len(args.input) != 2:
-        raise RuntimeError("Can only render two files side by side.")
+    if args.side_by_side:
+        if len(args.input) < 2:
+            raise RuntimeError("Too few files to render side by side.")
+        elif len(args.input) > 2:
+            raise RuntimeError("Too many files to render side by side.")
 
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
@@ -120,11 +121,13 @@ def main():
 
         # Render lefthand input
         fd0, filename0 = mkstemp()
-        write(filename0, [render(args.input[0], color=not args.no_color, size=size)], False)
+        write(filename0, [render(args.input[0], color=not args.no_color,
+                                 fontSize="8pt", margin=".5in .25in .5in .5in", size=size)], False)
 
         # Render righthand input
         fd1, filename1 = mkstemp()
-        write(filename1, [render(args.input[1], color=not args.no_color, size=size)], False)
+        write(filename1, [render(args.input[1], color=not args.no_color,
+                                 fontSize="8pt", margin=".5in .5in .5in .25in", size=size)], False)
 
         # Render blank input
         fd2, filename2 = mkstemp()
@@ -188,13 +191,13 @@ def main():
     paths = []
     for pattern in patterns:
         if pattern:
-            paths += natsorted(glob.glob(pattern), alg=ns.IGNORECASE)
+            paths += natsorted(glob(pattern), alg=ns.IGNORECASE)
 
     # Candidates to render
     candidates = []
     for path in paths:
         if not os.access(path, os.R_OK):
-            raise RuntimeError("Could not read: {}".format(path))
+            raise RuntimeError("Could not read {}.".format(path))
         if os.path.isfile(path):
             candidates.append(path)
         elif os.path.isdir(path):
@@ -205,7 +208,7 @@ def main():
             natsorted(files, alg=ns.IGNORECASE)
             candidates += files
         else:
-            raise RuntimeError("Unsupported: {}".format(path))
+            raise RuntimeError("Could not recognize {}.".format(path))
 
     # Filter candidates
     queue = []
@@ -239,7 +242,7 @@ def main():
 
 def blank(size):
     """Render blank page of specified size."""
-    return HTML(string="BLANK").render(stylesheets=[CSS(string="@page {{ size: {}; }}".format(size.replace(";", "\;")))])
+    return HTML(string="").render(stylesheets=[CSS(string="@page {{ size: {}; }}".format(size))])
 
 
 def cancel(code=0):
@@ -257,7 +260,7 @@ def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
         columns = 80
 
     # Print text, flushing output
-    termcolor.cprint(textwrap.fill(text, columns, drop_whitespace=False, replace_whitespace=False),
+    termcolor.cprint(fill(text, columns, drop_whitespace=False, replace_whitespace=False),
                      color=color, on_color=on_color, attrs=attrs, end=end)
     sys.stdout.flush()
 
@@ -269,72 +272,82 @@ def excepthook(type, value, tb):
         cprint(str(value), "yellow")
     else:
         cprint("Sorry, something's wrong! Let sysadmins@cs50.harvard.edu know!", "yellow")
-        traceback.print_exception(type, value, tb)
+        print_exception(type, value, tb)
     cancel(1)
 
 
 sys.excepthook = excepthook
 
 
-def render(filename, size, color=True):
+def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Open file
     cprint("Rendering {}...".format(filename), end="")
-    with open(filename, "rb") as file:
+    try: 
+        with open(filename, "rb") as file:
 
-        # Read file
-        code = file.read().decode("utf-8", "ignore")
+            # Read file
+            code = file.read().decode("utf-8", "ignore")
 
-        # Check whether binary file
-        if "\x00" in code:
-            cprint("\033[2K", end="\r")
-            cprint("Skipped {} because binary.".format(filename), "yellow")
-            return None
+            # Check whether binary file
+            if "\x00" in code:
+                cprint("\033[2K", end="\r")
+                cprint("Skipped {} because binary.".format(filename), "yellow")
+                return None
 
-        # Highlight code unless file is empty, using inline line numbers to avoid
-        # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-        string = ""
-        if code.strip() and color:
-            try:
-                lexer = guess_lexer_for_filename(filename, code)
-            except:
+            # Highlight code unless file is empty, using inline line numbers to avoid
+            # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+            string = ""
+            if code.strip() and color:
                 try:
-                    lexer = guess_lexer(code)
+                    lexer = guess_lexer_for_filename(filename, code)
                 except:
-                    lexer = TextLexer()
-            string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+                    try:
+                        lexer = guess_lexer(code)
+                    except:
+                        lexer = TextLexer()
+                string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+            else:
+                string = highlight(code, TextLexer(), HtmlFormatter(
+                    linenos="inline", nobackground=True))
+
+            # Stylize document
+            stylesheets = [
+                CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
+                CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
+                    filename.replace("'", "\'"))),
+                CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; white-space: pre-wrap; }}".format(fontSize)),
+                CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+                CSS(string=".highlight { background: initial; }"),
+                CSS(string=".lineno { color: #808080; }"),
+                CSS(string=".lineno:after { content: '  '; }")]
+
+            # Render document
+            document = HTML(string=string).render(stylesheets=stylesheets)
+
+            # Bookmark document
+            document.pages[0].bookmarks = [(1, filename, (0, 0))]
+
+        # Rendered
+        cprint("\033[2K", end="\r")
+        cprint("Rendered {}.".format(filename))
+        return document
+
+    # Check for errors
+    except Exception as e:
+        cprint("\033[2K", end="\r")
+        if type(e) is FileNotFoundError:
+            e = RuntimeError("Could not find {}.".format(filename))
         else:
-            string = highlight(code, TextLexer(), HtmlFormatter(
-                linenos="inline", nobackground=True))
-
-        # Stylize document
-        stylesheets = [
-            CSS(string="@page {{ border-top: 1px #808080 solid; margin: 0.5in; size: {}; }}".format(
-                size.replace(";", "\;"))),
-            CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; }} }}".format(filename.replace("'", "\'"))),
-            CSS(string="* { font-family: monospace; font-size: 10pt; white-space: pre-wrap; }"),
-            CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-            CSS(string=".highlight { background: initial; }"),
-            CSS(string=".lineno { color: #808080; }"),
-            CSS(string=".lineno:after { content: '  '; }")]
-
-        # Render document
-        document = HTML(string=string).render(stylesheets=stylesheets)
-
-        # Bookmark document
-        document.pages[0].bookmarks = [(1, filename, (0, 0))]
-
-    # Rendered
-    cprint("\033[2K", end="\r")
-    cprint("Rendered {}.".format(filename))
-    return document
+            e = RuntimeError("Could not read {}.".format(filename))
+        e.__cause__ = None
+        raise e
 
 
 def write(output, documents, echo=True):
     """
     Write documents to output as PDF.
-    
     https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     """
     if documents:
@@ -351,7 +364,7 @@ def write(output, documents, echo=True):
 # http://weasyprint.readthedocs.io/en/latest/install.html
 try:
     # Ignore warnings about outdated Cairo and Pango (on Ubuntu 14.04, at least)
-    warnings.filterwarnings("ignore", category=UserWarning, module="weasyprint")
+    filterwarnings("ignore", category=UserWarning, module="weasyprint")
     from weasyprint import CSS, HTML
 except OSError as e:
     if "pangocairo" in str(e):
