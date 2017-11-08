@@ -7,7 +7,7 @@ branches:
 install: pip install .
 script:
 - render50 -h
-- touch foo.c && render50 -O foo.pdf foo.c && test -f foo.pdf
+- touch foo.c && render50 -o foo.pdf foo.c && test -f foo.pdf
 jobs:
   include:
   - stage: deploy
