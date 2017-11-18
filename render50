@@ -295,6 +295,15 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
         matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
         if matches:
             filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
+        matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
+        if matches:
+            filename = "{}/raw".format(matches.group(1))
+            if matches.group(2):
+                filename += "/{}".format(matches.group(2))
+
+        print()
+        print(filename)
+        sys.exit(0)
 
         # Get file
         req = requests.get(filename)
