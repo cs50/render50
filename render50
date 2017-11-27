@@ -53,10 +53,10 @@ def main():
     # Parse command-line arguments
     parser = ArgumentParser(description="A command-line tool that "
                                                  "renders source code as a PDF.")
-    parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-o", "--output", help="file to output", required=True)
+    parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--size", help="size of page")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-V", "--version", action="version",
@@ -301,10 +301,6 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
             if matches.group(2):
                 filename += "/{}".format(matches.group(2))
 
-        print()
-        print(filename)
-        sys.exit(0)
-
         # Get file
         req = requests.get(filename)
         if req.status_code == 200:
@@ -336,13 +332,13 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
 
     # Highlight code unless file is empty, using inline line numbers to avoid
     # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-    string = ""
     if code.strip() and color:
         try:
             lexer = guess_lexer_for_filename(filename, code)
         except:
             try:
-                lexer = guess_lexer(code)
+                assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
+                lexer = guess_lexer(code.splitlines()[0])
             except:
                 lexer = TextLexer()
         string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
