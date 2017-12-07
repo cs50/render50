@@ -351,7 +351,7 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
         CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
         CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
             filename.replace("'", "\'"))),
-        CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; white-space: pre-wrap; }}".format(fontSize)),
+        CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
         CSS(string=HtmlFormatter().get_style_defs('.highlight')),
         CSS(string=".highlight { background: initial; }"),
         CSS(string=".lineno { color: #808080; }"),
