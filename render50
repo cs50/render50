@@ -7,18 +7,20 @@ import sys
 import requests
 import termcolor
 
-from signal import SIGINT, signal
-from pkg_resources import DistributionNotFound, get_distribution
 from argparse import ArgumentParser
 from backports.shutil_get_terminal_size import get_terminal_size
+from bs4 import BeautifulSoup
 from copy import copy
 from glob import glob
 from natsort import natsorted, ns
+from pkg_resources import DistributionNotFound, get_distribution
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.lexers.special import TextLexer
 from PyPDF2 import PdfFileReader, PdfFileWriter
+from requests.exceptions import RequestException
+from signal import SIGINT, signal
 from tempfile import mkstemp
 from textwrap import fill
 from traceback import print_exception
@@ -106,25 +108,56 @@ def main():
     # Determine size
     # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
     if not args.size:
-        size = "letter landscape"
+        if args.browser:
+            size = "letter portrait"
+        else:
+            size = "letter landscape"
     elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
         size = "{} landscape".format(args.size)
     else:
         size = args.size.strip()
 
-    # Only render one file, as browser would
+    # Only render one input, as browser would
     if args.browser:
 
-        # Render input
-        document = render(args.input[0], browser=args.browser, size=size)
-        if not document:
-            cancel(1)
+        # Convert 2-frame framesets to two side-by-side inputs
+        try:
+            if args.input[0].startswith(("http", "https")):
+                req = requests.get(filename)
+                assert req.status_code == 200
+                page = req.text
+            else:
+                file = open(args.input[0], "rb")
+                page = file.read().decode("utf-8", "ignore")
+            soup = BeautifulSoup(page, "html.parser")
+            framesets = soup.find_all("frameset")
+            assert len(framesets) == 1
+            frames = framesets[0].find_all("frame")
+            assert len(frames) == 2
+            if not args.size:
+                size = "letter landscape"
+            args.side_by_side = True
+            if args.input[0].startswith(("http", "https")):
+                args.input = [
+                    urljoin(args.input[0], frames[0].attrs["src"]),
+                    urljoin(args.input[0], frames[1].attrs["src"])]
+            else:
+                dirname = os.path.dirname(args.input[0])
+                args.input = [
+                    os.path.join(dirname, frames[0].attrs["src"]),
+                    os.path.join(dirname, frames[1].attrs["src"])]
+        except:
 
-        # Write rendered output
-        write(output, [document])
-        sys.exit(0)
+            # Render input
+            document = render(args.input[0], browser=True, size=size)
+            if not document:
+                cancel(1)
 
-    # Only render two files, side by side
+            # Write rendered output
+            write(output, [document])
+            sys.exit(0)
+
+    # Only render two inputs, side by side
     if args.side_by_side:
 
         # Halve width
@@ -135,7 +168,7 @@ def main():
 
         # Render lefthand input
         fd0, filename0 = mkstemp()
-        document = render(args.input[0], color=not args.no_color,
+        document = render(args.input[0], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=".5in .25in .5in .5in", size=size)
         if not document:
             cancel(1)
@@ -143,7 +176,7 @@ def main():
 
         # Render righthand input
         fd1, filename1 = mkstemp()
-        document = render(args.input[1], color=not args.no_color,
+        document = render(args.input[1], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
         if not document:
             cancel(1)
@@ -298,26 +331,19 @@ sys.excepthook = excepthook
 def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
-    # Styles for document
-    stylesheets = [
-        CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
-        CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
-            filename.replace("'", "\'"))),
-        CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
-        CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-        CSS(string=".highlight { background: initial; }"),
-        CSS(string=".lineno { color: #808080; }"),
-        CSS(string=".lineno:after { content: '  '; }")]
-
     # Rendering
     cprint("Rendering {}...".format(filename), end="")
 
     # Render as a browser would
     if browser:
 
+        # Styles for document
+        stylesheets = [CSS(string="@page {{ margin: {}; size: {}; }}".format(margin, size))]
+
+        # Render document
         try:
             document = HTML(filename).render(stylesheets=stylesheets)
-        except URLFetchingError:
+        except (RequestException, URLFetchingError):
             cprint("\033[2K", end="\r")
             raise RuntimeError("Could not GET {}.".format(filename))
 
@@ -382,6 +408,17 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             string = highlight(code, TextLexer(), HtmlFormatter(
                 linenos="inline", nobackground=True))
 
+        # Styles for document
+        stylesheets = [
+            CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
+            CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
+                filename.replace("'", "\'"))),
+            CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
+            CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+            CSS(string=".highlight { background: initial; }"),
+            CSS(string=".lineno { color: #808080; }"),
+            CSS(string=".lineno:after { content: '  '; }")]
+
         # Render document
         document = HTML(string=string).render(stylesheets=stylesheets)
 
@@ -409,6 +446,25 @@ def write(output, documents, echo=True):
             cprint("Nothing to render.", "red")
 
 
+def _inline_min_content_width(context, box, outer=True, skip_stack=None,
+                             first_line=False, is_line_start=False):
+    """Return the min-content width for an ``InlineBox``.
+    The width is calculated from the lines from ``skip_stack``. If
+    ``first_line`` is ``True``, only the first line minimum width is
+    calculated.
+    """
+    widths = weasyprint.layout.preferred.inline_line_widths(
+        context, box, outer, is_line_start, minimum=True,
+        skip_stack=skip_stack)
+
+    if first_line:
+        widths = [next(widths)]
+    else:
+        widths = list(widths)
+        widths[-1] -= weasyprint.layout.preferred.trailing_whitespace_size(context, box)
+    return weasyprint.layout.preferred.adjust(box, outer, max(widths))
+
+
 # Check for dependencies
 # http://weasyprint.readthedocs.io/en/latest/install.html
 try:
@@ -429,6 +485,12 @@ except OSError as e:
         e = RuntimeError(str(e))
         e.__cause__ = None
         raise e
+else:
+    # Temporary until https://github.com/Kozea/WeasyPrint/milestone/7 is confirmed as deployed
+    import weasyprint.layout.inlines
+    weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
+    import weasyprint.layout.preferred
+    weasyprint.layout.preferred.inline_min_content_width = _inline_min_content_width
 
 
 if __name__ == "__main__":
