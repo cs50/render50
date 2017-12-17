@@ -25,7 +25,7 @@ from traceback import print_exception
 from warnings import filterwarnings
 
 
-# require python 2.7+
+# Require python 2.7+
 if sys.version_info < (2, 7):
     sys.exit("You have an old version of python. Install version 2.7 or higher.")
 if sys.version_info < (3, 0):
@@ -53,6 +53,7 @@ def main():
     # Parse command-line arguments
     parser = ArgumentParser(description="A command-line tool that "
                                                  "renders source code as a PDF.")
+    parser.add_argument("-b", "--browser", action="store_true", help="render as a browser would")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-o", "--output", help="file to output", required=True)
@@ -110,6 +111,18 @@ def main():
         size = "{} landscape".format(args.size)
     else:
         size = args.size.strip()
+
+    # Only render one file, as browser would
+    if args.browser:
+
+        # Render input
+        document = render(args.input[0], browser=args.browser, size=size)
+        if not document:
+            cancel(1)
+
+        # Write rendered output
+        write(output, [document])
+        sys.exit(0)
 
     # Only render two files, side by side
     if args.side_by_side:
@@ -282,71 +295,10 @@ def excepthook(type, value, tb):
 sys.excepthook = excepthook
 
 
-def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
+def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
-    # Rendering
-    cprint("Rendering {}...".format(filename), end="")
-
-    # Check if URL
-    if filename.startswith(("http", "https")):
-
-        # Get from raw.githubusercontent.com
-        matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
-        if matches:
-            filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
-        matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
-        if matches:
-            filename = "{}/raw".format(matches.group(1))
-            if matches.group(2):
-                filename += "/{}".format(matches.group(2))
-
-        # Get file
-        req = requests.get(filename)
-        if req.status_code == 200:
-            code = req.text
-        else:
-            cprint("\033[2K", end="\r")
-            raise RuntimeError("Could not GET {}.".format(filename))
-
-    # Read file
-    else:
-        try: 
-            file = open(filename, "rb")
-            code = file.read().decode("utf-8", "ignore")
-            file.close()
-        except Exception as e:
-            cprint("\033[2K", end="\r")
-            if type(e) is FileNotFoundError:
-                e = RuntimeError("Could not find {}.".format(filename))
-            else:
-                e = RuntimeError("Could not read {}.".format(filename))
-            e.__cause__ = None
-            raise e
-
-    # Check whether binary file
-    if "\x00" in code:
-        cprint("\033[2K", end="\r")
-        cprint("Could not render {} because binary.".format(filename), "yellow")
-        return None
-
-    # Highlight code unless file is empty, using inline line numbers to avoid
-    # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-    if code.strip() and color:
-        try:
-            lexer = guess_lexer_for_filename(filename, code)
-        except:
-            try:
-                assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
-                lexer = guess_lexer(code.splitlines()[0])
-            except:
-                lexer = TextLexer()
-        string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
-    else:
-        string = highlight(code, TextLexer(), HtmlFormatter(
-            linenos="inline", nobackground=True))
-
-    # Stylize document
+    # Styles for document
     stylesheets = [
         CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
         CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
@@ -357,8 +309,81 @@ def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
         CSS(string=".lineno { color: #808080; }"),
         CSS(string=".lineno:after { content: '  '; }")]
 
-    # Render document
-    document = HTML(string=string).render(stylesheets=stylesheets)
+    # Rendering
+    cprint("Rendering {}...".format(filename), end="")
+
+    # Render as a browser would
+    if browser:
+
+        try:
+            document = HTML(filename).render(stylesheets=stylesheets)
+        except URLFetchingError:
+            cprint("\033[2K", end="\r")
+            raise RuntimeError("Could not GET {}.".format(filename))
+
+    # Syntax-highlight instead
+    else:
+
+        # Check if URL
+        if filename.startswith(("http", "https")):
+
+            # Get from raw.githubusercontent.com
+            matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
+            if matches:
+                filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
+            matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
+            if matches:
+                filename = "{}/raw".format(matches.group(1))
+                if matches.group(2):
+                    filename += "/{}".format(matches.group(2))
+
+            # Get file
+            req = requests.get(filename)
+            if req.status_code == 200:
+                code = req.text
+            else:
+                cprint("\033[2K", end="\r")
+                raise RuntimeError("Could not GET {}.".format(filename))
+
+        # Read file
+        else:
+            try: 
+                file = open(filename, "rb")
+                code = file.read().decode("utf-8", "ignore")
+                file.close()
+            except Exception as e:
+                cprint("\033[2K", end="\r")
+                if type(e) is FileNotFoundError:
+                    e = RuntimeError("Could not find {}.".format(filename))
+                else:
+                    e = RuntimeError("Could not read {}.".format(filename))
+                e.__cause__ = None
+                raise e
+
+        # Check whether binary file
+        if "\x00" in code:
+            cprint("\033[2K", end="\r")
+            cprint("Could not render {} because binary.".format(filename), "yellow")
+            return None
+
+        # Highlight code unless file is empty, using inline line numbers to avoid
+        # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+        if code.strip() and color:
+            try:
+                lexer = guess_lexer_for_filename(filename, code)
+            except:
+                try:
+                    assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
+                    lexer = guess_lexer(code.splitlines()[0])
+                except:
+                    lexer = TextLexer()
+            string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+        else:
+            string = highlight(code, TextLexer(), HtmlFormatter(
+                linenos="inline", nobackground=True))
+
+        # Render document
+        document = HTML(string=string).render(stylesheets=stylesheets)
 
     # Bookmark document
     document.pages[0].bookmarks = [(1, filename, (0, 0))]
@@ -390,6 +415,7 @@ try:
     # Ignore warnings about outdated Cairo and Pango (on Ubuntu 14.04, at least)
     filterwarnings("ignore", category=UserWarning, module="weasyprint")
     from weasyprint import CSS, HTML
+    from weasyprint.urls import URLFetchingError
 except OSError as e:
     if "pangocairo" in str(e):
         e = RuntimeError("Missing dependency. Install Pango.")
