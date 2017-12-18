@@ -7,29 +7,36 @@ import sys
 import requests
 import termcolor
 
-from signal import SIGINT, signal
-from pkg_resources import DistributionNotFound, get_distribution
 from argparse import ArgumentParser
 from backports.shutil_get_terminal_size import get_terminal_size
+from bs4 import BeautifulSoup
 from copy import copy
 from glob import glob
 from natsort import natsorted, ns
+from pkg_resources import DistributionNotFound, get_distribution
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.lexers.special import TextLexer
 from PyPDF2 import PdfFileReader, PdfFileWriter
+from requests.exceptions import RequestException
+from signal import SIGINT, signal
 from tempfile import mkstemp
 from textwrap import fill
 from traceback import print_exception
 from warnings import filterwarnings
 
 
-# require python 2.7+
+# Require Python 2.7+
 if sys.version_info < (2, 7):
     sys.exit("You have an old version of python. Install version 2.7 or higher.")
+
+# Python 2 versus 3
 if sys.version_info < (3, 0):
     input = raw_input
+    from urlparse import urljoin
+else:
+    from urllib.parse import urljoin
 
 # Get version
 try:
@@ -53,17 +60,18 @@ def main():
     # Parse command-line arguments
     parser = ArgumentParser(description="A command-line tool that "
                                                  "renders source code as a PDF.")
-    parser.add_argument("-i", "--include", action="append", help="pattern to include")
+    parser.add_argument("-b", "--browser", action="store_true", help="render as a browser would")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
+    parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
-    parser.add_argument("-s", "--size", help="size of page")
+    parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
-    parser.add_argument("-V", "--version", action="version",
-                        version="%(prog)s {}".format(__version__))
     parser.add_argument("-y", "--side-by-side", action="store_true",
-                        help="render two inputs side-by-side")
+                       help="render inputs side by side")
     parser.add_argument("input", help="file or URL to render", nargs="+")
+    parser.add_argument("-V", "--version", action="version",
+                       version="%(prog)s {}".format(__version__))
     args = parser.parse_args(sys.argv[1:])
 
     # Ensure output ends in .pdf
@@ -84,7 +92,7 @@ def main():
     if args.side_by_side:
         if len(args.input) < 2:
             raise RuntimeError("Too few files to render side by side.")
-        elif len(args.input) > 2:
+        elif len(args.input) > 3:
             raise RuntimeError("Too many files to render side by side.")
 
     # Create parent directory as needed
@@ -105,71 +113,93 @@ def main():
     # Determine size
     # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
     if not args.size:
-        size = "letter landscape"
+        if args.browser:
+            size = "letter portrait"
+        else:
+            size = "letter landscape"
     elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
         size = "{} landscape".format(args.size)
     else:
         size = args.size.strip()
 
-    # Only render two files, side by side
+    # Render (1 input) as browser would
+    if args.browser:
+
+        # frameset
+        try:
+            if args.input[0].startswith(("http", "https")):
+                req = requests.get(filename)
+                assert req.status_code == 200
+                page = req.text
+            else:
+                file = open(args.input[0], "rb")
+                page = file.read().decode("utf-8", "ignore")
+            soup = BeautifulSoup(page, "html.parser")
+            framesets = soup.find_all("frameset", {"cols": re.compile("50%,\s*50%")})
+            assert len(framesets) == 1
+            frames = framesets[0].find_all("frame")
+            assert 2 <= len(frames) <= 3
+            if not args.size:
+                size = "letter landscape"
+            args.side_by_side = True
+            args.input = [join(args.input[0], frame.attrs["src"]) for frame in frames]
+
+        # noframes
+        except:
+
+            # Render input
+            document = render(args.input[0], browser=True, size=size)
+            if not document:
+                cancel(1)
+
+            # Write rendered output
+            write(output, [document])
+            sys.exit(0)
+
+    # Render (2-3 inputs) side by side
     if args.side_by_side:
 
-        # Halve width
+        # Divide width
         document = blank(size)
-        width = int(document.pages[0].width / 2)
+        width = int(document.pages[0].width / len(args.input))
         height = int(document.pages[0].height)
         size = "{}px {}px".format(width, height)
 
-        # Render lefthand input
-        fd0, filename0 = mkstemp()
-        document = render(args.input[0], color=not args.no_color,
+        # temporary files
+        temps = []
+
+        # Render first input
+        temps.append(mkstemp())
+        document = render(args.input[0], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=".5in .25in .5in .5in", size=size)
         if not document:
             cancel(1)
-        write(filename0, [document], False)
+        write(temps[0][1], [document], False)
 
-        # Render righthand input
-        fd1, filename1 = mkstemp()
-        document = render(args.input[1], color=not args.no_color,
-                          fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
+        # Render second input
+        temps.append(mkstemp())
+        margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .25in .5in .25in"
+        document = render(args.input[1], browser=args.browser, color=not args.no_color,
+                          fontSize="8pt", margin=margin, size=size)
         if not document:
             cancel(1)
-        write(filename1, [document], False)
+        write(temps[1][1], [document], False)
 
-        # Render blank input
-        fd2, filename2 = mkstemp()
-        write(filename2, [blank(size)], False)
+        # Render third input, if any
+        if len(args.input) == 3:
+            temps.append(mkstemp())
+            document = render(args.input[2], browser=args.browser, color=not args.no_color,
+                              fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
+            if not document:
+                cancel(1)
+            write(temps[2][1], [document], False)
 
-        # Concatenate files side by side
-        pdf = PdfFileWriter()
-        with open(filename0, "rb") as file0, open(filename1, "rb") as file1, open(filename2, "rb") as file2:
-
-            # Read files
-            pdf0 = PdfFileReader(file0)
-            pdf1 = PdfFileReader(file1)
-            pdf2 = PdfFileReader(file2)
-
-            # Concatenate pages
-            for i in range(max(pdf0.getNumPages(), pdf1.getNumPages())):
-
-                # Copy pages
-                left = copy(pdf0.getPage(i)) if i < pdf0.getNumPages() else copy(pdf2.getPage(0))
-                right = copy(pdf1.getPage(i)) if i < pdf1.getNumPages() else copy(pdf2.getPage(0))
-
-                # Merge pages
-                left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
-
-                # Add pages to output
-                pdf.addPage(left)
-
-            # Ouput PDF
-            with open(output, "wb") as file:
-                pdf.write(file)
+        # Concatenate inputs
+        concatenate(output, size, list(map(lambda f: f[1], temps)))
 
         # Remove temporary files
-        os.close(fd0), os.remove(filename0)
-        os.close(fd1), os.remove(filename1)
-        os.close(fd2), os.remove(filename2)
+        map(lambda f: os.close(f[0]), temps)
+        map(lambda f: os.remove(f[1]), temps)
 
         # Rendered
         cprint("Rendered {}.".format(output), "green")
@@ -254,6 +284,42 @@ def cancel(code=0):
     sys.exit(code)
 
 
+def concatenate(output, size, inputs):
+    """Concatenate (PDF) inputs of specified size side by side."""
+
+    # Read files
+    readers = list(map(PdfFileReader, inputs))
+
+    # Render blank page
+    temp = mkstemp()
+    write(temp[1], [blank(size)], False)
+    page = PdfFileReader(temp[1]).getPage(0)
+
+    # Concatenate files side by side
+    writer = PdfFileWriter()
+
+    # Concatenate pages
+    for i in range(max(map(lambda r: r.getNumPages(), readers))):
+
+        # Leftmost page
+        left = copy(readers[0].getPage(i)) if i < readers[0].getNumPages() else copy(page)
+
+        # Rightmost pages
+        for reader in readers[1:]:
+            right = copy(reader.getPage(i)) if i < reader.getNumPages() else copy(page)
+            left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
+
+        # Add pages to output
+        writer.addPage(left)
+
+    # Ouput PDF
+    with open(output, "wb") as file:
+        writer.write(file)
+
+    # Remove temporary files
+    os.close(temp[0]), os.remove(temp[1])
+
+
 def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
@@ -282,83 +348,122 @@ def excepthook(type, value, tb):
 sys.excepthook = excepthook
 
 
-def render(filename, size, color=True, fontSize="10pt", margin=".5in"):
+def join(a, b):
+    """Join a and b, where each is a URL, an absolute path, or a relative path."""
+
+    # If b is a URL, don't join
+    if b.startswith(("http://", "https://")):
+        return b
+    
+    # if a is a URL (and b is not), join with b
+    if a.startswith(("http://", "https://")):
+        return urljoin(a, b)
+
+    # if a is an absolute or a relative path, join with b
+    else:
+        return os.path.normpath(os.path.join(os.path.dirname(a), b))
+ 
+
+def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
     cprint("Rendering {}...".format(filename), end="")
 
-    # Check if URL
-    if filename.startswith(("http", "https")):
+    # Render as a browser would
+    if browser:
 
-        # Get from raw.githubusercontent.com
-        matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
-        if matches:
-            filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
-        matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
-        if matches:
-            filename = "{}/raw".format(matches.group(1))
-            if matches.group(2):
-                filename += "/{}".format(matches.group(2))
+        # Styles for document
+        stylesheets = [
+            CSS(string="@page {{ margin: {}; size: {}; }}".format(margin, size)),
+            CSS(string="* {{ font-size: {}; }}".format(fontSize))]
 
-        # Get file
-        req = requests.get(filename)
-        if req.status_code == 200:
-            code = req.text
-        else:
-            cprint("\033[2K", end="\r")
-            raise RuntimeError("Could not GET {}.".format(filename))
-
-    # Read file
-    else:
-        try: 
-            file = open(filename, "rb")
-            code = file.read().decode("utf-8", "ignore")
-            file.close()
+        # Render document
+        try:
+            document = HTML(filename).render(stylesheets=stylesheets)
         except Exception as e:
             cprint("\033[2K", end="\r")
-            if type(e) is FileNotFoundError:
-                e = RuntimeError("Could not find {}.".format(filename))
+            if type(e) in [RequestException, URLFetchingError]:
+                e = RuntimeError("Could not GET {}.".format(filename))
             else:
                 e = RuntimeError("Could not read {}.".format(filename))
             e.__cause__ = None
             raise e
 
-    # Check whether binary file
-    if "\x00" in code:
-        cprint("\033[2K", end="\r")
-        cprint("Could not render {} because binary.".format(filename), "yellow")
-        return None
-
-    # Highlight code unless file is empty, using inline line numbers to avoid
-    # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-    if code.strip() and color:
-        try:
-            lexer = guess_lexer_for_filename(filename, code)
-        except:
-            try:
-                assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
-                lexer = guess_lexer(code.splitlines()[0])
-            except:
-                lexer = TextLexer()
-        string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+    # Syntax-highlight instead
     else:
-        string = highlight(code, TextLexer(), HtmlFormatter(
-            linenos="inline", nobackground=True))
 
-    # Stylize document
-    stylesheets = [
-        CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
-        CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
-            filename.replace("'", "\'"))),
-        CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
-        CSS(string=HtmlFormatter().get_style_defs('.highlight')),
-        CSS(string=".highlight { background: initial; }"),
-        CSS(string=".lineno { color: #808080; }"),
-        CSS(string=".lineno:after { content: '  '; }")]
+        # Check if URL
+        if filename.startswith(("http", "https")):
 
-    # Render document
-    document = HTML(string=string).render(stylesheets=stylesheets)
+            # Get from raw.githubusercontent.com
+            matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
+            if matches:
+                filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
+            matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
+            if matches:
+                filename = "{}/raw".format(matches.group(1))
+                if matches.group(2):
+                    filename += "/{}".format(matches.group(2))
+
+            # Get file
+            req = requests.get(filename)
+            if req.status_code == 200:
+                code = req.text
+            else:
+                cprint("\033[2K", end="\r")
+                raise RuntimeError("Could not GET {}.".format(filename))
+
+        # Read file
+        else:
+            try: 
+                file = open(filename, "rb")
+                code = file.read().decode("utf-8", "ignore")
+                file.close()
+            except Exception as e:
+                cprint("\033[2K", end="\r")
+                if type(e) is FileNotFoundError:
+                    e = RuntimeError("Could not find {}.".format(filename))
+                else:
+                    e = RuntimeError("Could not read {}.".format(filename))
+                e.__cause__ = None
+                raise e
+
+        # Check whether binary file
+        if "\x00" in code:
+            cprint("\033[2K", end="\r")
+            cprint("Could not render {} because binary.".format(filename), "yellow")
+            return None
+
+        # Highlight code unless file is empty, using inline line numbers to avoid
+        # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
+        if code.strip() and color:
+            try:
+                lexer = guess_lexer_for_filename(filename, code)
+            except:
+                try:
+                    assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
+                    lexer = guess_lexer(code.splitlines()[0])
+                except:
+                    lexer = TextLexer()
+            string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+        else:
+            string = highlight(code, TextLexer(), HtmlFormatter(
+                linenos="inline", nobackground=True))
+
+        # Styles for document
+        stylesheets = [
+            CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
+            CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
+                filename.replace("'", "\'"))),
+            CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
+            CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+            CSS(string=".highlight { background: initial; }"),
+            CSS(string=".lineno { color: #808080; }"),
+            CSS(string=".lineno:after { content: '  '; }")]
+
+        # Render document
+        document = HTML(string=string).render(stylesheets=stylesheets)
 
     # Bookmark document
     document.pages[0].bookmarks = [(1, filename, (0, 0))]
@@ -384,12 +489,32 @@ def write(output, documents, echo=True):
             cprint("Nothing to render.", "red")
 
 
+def _inline_min_content_width(context, box, outer=True, skip_stack=None,
+                             first_line=False, is_line_start=False):
+    """Return the min-content width for an ``InlineBox``.
+    The width is calculated from the lines from ``skip_stack``. If
+    ``first_line`` is ``True``, only the first line minimum width is
+    calculated.
+    """
+    widths = weasyprint.layout.preferred.inline_line_widths(
+        context, box, outer, is_line_start, minimum=True,
+        skip_stack=skip_stack)
+
+    if first_line:
+        widths = [next(widths)]
+    else:
+        widths = list(widths)
+        widths[-1] -= weasyprint.layout.preferred.trailing_whitespace_size(context, box)
+    return weasyprint.layout.preferred.adjust(box, outer, max(widths))
+
+
 # Check for dependencies
 # http://weasyprint.readthedocs.io/en/latest/install.html
 try:
     # Ignore warnings about outdated Cairo and Pango (on Ubuntu 14.04, at least)
     filterwarnings("ignore", category=UserWarning, module="weasyprint")
     from weasyprint import CSS, HTML
+    from weasyprint.urls import URLFetchingError
 except OSError as e:
     if "pangocairo" in str(e):
         e = RuntimeError("Missing dependency. Install Pango.")
@@ -403,6 +528,13 @@ except OSError as e:
         e = RuntimeError(str(e))
         e.__cause__ = None
         raise e
+else:
+    # Temporary until https://github.com/Kozea/WeasyPrint/issues/483 and
+    # https://github.com/Kozea/WeasyPrint/issues/553 are confirmed as resolved
+    import weasyprint.layout.inlines
+    weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
+    import weasyprint.layout.preferred
+    weasyprint.layout.preferred.inline_min_content_width = _inline_min_content_width
 
 
 if __name__ == "__main__":
