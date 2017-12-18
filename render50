@@ -27,11 +27,16 @@ from traceback import print_exception
 from warnings import filterwarnings
 
 
-# Require python 2.7+
+# Require Python 2.7+
 if sys.version_info < (2, 7):
     sys.exit("You have an old version of python. Install version 2.7 or higher.")
+
+# Python 2 versus 3
 if sys.version_info < (3, 0):
     input = raw_input
+    from urlparse import urljoin
+else:
+    from urllib.parse import urljoin
 
 # Get version
 try:
@@ -87,7 +92,7 @@ def main():
     if args.side_by_side:
         if len(args.input) < 2:
             raise RuntimeError("Too few files to render side by side.")
-        elif len(args.input) > 2:
+        elif len(args.input) > 3:
             raise RuntimeError("Too many files to render side by side.")
 
     # Create parent directory as needed
@@ -117,10 +122,10 @@ def main():
     else:
         size = args.size.strip()
 
-    # Only render one input, as browser would
+    # Render (1 input) as browser would
     if args.browser:
 
-        # Convert 2-frame framesets to two side-by-side inputs
+        # frameset
         try:
             if args.input[0].startswith(("http", "https")):
                 req = requests.get(filename)
@@ -133,19 +138,13 @@ def main():
             framesets = soup.find_all("frameset")
             assert len(framesets) == 1
             frames = framesets[0].find_all("frame")
-            assert len(frames) == 2
+            assert 2 <= len(frames) <= 3
             if not args.size:
                 size = "letter landscape"
             args.side_by_side = True
-            if args.input[0].startswith(("http", "https")):
-                args.input = [
-                    urljoin(args.input[0], frames[0].attrs["src"]),
-                    urljoin(args.input[0], frames[1].attrs["src"])]
-            else:
-                dirname = os.path.dirname(args.input[0])
-                args.input = [
-                    os.path.join(dirname, frames[0].attrs["src"]),
-                    os.path.join(dirname, frames[1].attrs["src"])]
+            args.input = [join(args.input[0], frame.attrs["src"]) for frame in frames]
+
+        # noframes
         except:
 
             # Render input
@@ -157,65 +156,50 @@ def main():
             write(output, [document])
             sys.exit(0)
 
-    # Only render two inputs, side by side
+    # Render (2-3 inputs) side by side
     if args.side_by_side:
 
-        # Halve width
+        # Divide width
         document = blank(size)
-        width = int(document.pages[0].width / 2)
+        width = int(document.pages[0].width / len(args.input))
         height = int(document.pages[0].height)
         size = "{}px {}px".format(width, height)
 
-        # Render lefthand input
-        fd0, filename0 = mkstemp()
+        # temporary files
+        temps = []
+
+        # Render first input
+        temps.append(mkstemp())
         document = render(args.input[0], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=".5in .25in .5in .5in", size=size)
         if not document:
             cancel(1)
-        write(filename0, [document], False)
+        write(temps[0][1], [document], False)
 
-        # Render righthand input
-        fd1, filename1 = mkstemp()
+        # Render second input
+        temps.append(mkstemp())
+        margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .25in .5in .25in"
         document = render(args.input[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
+                          fontSize="8pt", margin=margin, size=size)
         if not document:
             cancel(1)
-        write(filename1, [document], False)
+        write(temps[1][1], [document], False)
 
-        # Render blank input
-        fd2, filename2 = mkstemp()
-        write(filename2, [blank(size)], False)
+        # Render third input, if any
+        if len(args.input) == 3:
+            temps.append(mkstemp())
+            document = render(args.input[2], browser=args.browser, color=not args.no_color,
+                              fontSize="8pt", margin=".5in .5in .5in .25in", size=size)
+            if not document:
+                cancel(1)
+            write(temps[2][1], [document], False)
 
-        # Concatenate files side by side
-        pdf = PdfFileWriter()
-        with open(filename0, "rb") as file0, open(filename1, "rb") as file1, open(filename2, "rb") as file2:
-
-            # Read files
-            pdf0 = PdfFileReader(file0)
-            pdf1 = PdfFileReader(file1)
-            pdf2 = PdfFileReader(file2)
-
-            # Concatenate pages
-            for i in range(max(pdf0.getNumPages(), pdf1.getNumPages())):
-
-                # Copy pages
-                left = copy(pdf0.getPage(i)) if i < pdf0.getNumPages() else copy(pdf2.getPage(0))
-                right = copy(pdf1.getPage(i)) if i < pdf1.getNumPages() else copy(pdf2.getPage(0))
-
-                # Merge pages
-                left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
-
-                # Add pages to output
-                pdf.addPage(left)
-
-            # Ouput PDF
-            with open(output, "wb") as file:
-                pdf.write(file)
+        # Concatenate inputs
+        concatenate(output, size, list(map(lambda f: f[1], temps)))
 
         # Remove temporary files
-        os.close(fd0), os.remove(filename0)
-        os.close(fd1), os.remove(filename1)
-        os.close(fd2), os.remove(filename2)
+        map(lambda f: os.close(f[0]), temps)
+        map(lambda f: os.remove(f[1]), temps)
 
         # Rendered
         cprint("Rendered {}.".format(output), "green")
@@ -300,6 +284,42 @@ def cancel(code=0):
     sys.exit(code)
 
 
+def concatenate(output, size, inputs):
+    """Concatenate (PDF) inputs of specified size side by side."""
+
+    # Read files
+    readers = list(map(PdfFileReader, inputs))
+
+    # Render blank page
+    temp = mkstemp()
+    write(temp[1], [blank(size)], False)
+    page = PdfFileReader(temp[1]).getPage(0)
+
+    # Concatenate files side by side
+    writer = PdfFileWriter()
+
+    # Concatenate pages
+    for i in range(max(map(lambda r: r.getNumPages(), readers))):
+
+        # Leftmost page
+        left = copy(readers[0].getPage(i)) if i < readers[0].getNumPages() else copy(page)
+
+        # Rightmost pages
+        for reader in readers[1:]:
+            right = copy(reader.getPage(i)) if i < reader.getNumPages() else copy(page)
+            left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
+
+        # Add pages to output
+        writer.addPage(left)
+
+    # Ouput PDF
+    with open(output, "wb") as file:
+        writer.write(file)
+
+    # Remove temporary files
+    os.close(temp[0]), os.remove(temp[1])
+
+
 def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
@@ -328,6 +348,22 @@ def excepthook(type, value, tb):
 sys.excepthook = excepthook
 
 
+def join(a, b):
+    """Join a and b, where each is a URL, an absolute path, or a relative path."""
+
+    # If b is a URL, don't join
+    if b.startswith(("http://", "https://")):
+        return b
+    
+    # if a is a URL (and b is not), join with b
+    if a.startswith(("http://", "https://")):
+        return urljoin(a, b)
+
+    # if a is an absolute or a relative path, join with b
+    else:
+        return os.path.normpath(os.path.join(os.path.dirname(a), b))
+ 
+
 def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
 
@@ -338,14 +374,21 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
     if browser:
 
         # Styles for document
-        stylesheets = [CSS(string="@page {{ margin: {}; size: {}; }}".format(margin, size))]
+        stylesheets = [
+            CSS(string="@page {{ margin: {}; size: {}; }}".format(margin, size)),
+            CSS(string="* {{ font-size: {}; }}".format(fontSize))]
 
         # Render document
         try:
             document = HTML(filename).render(stylesheets=stylesheets)
-        except (RequestException, URLFetchingError):
+        except Exception as e:
             cprint("\033[2K", end="\r")
-            raise RuntimeError("Could not GET {}.".format(filename))
+            if type(e) in [RequestException, URLFetchingError]:
+                e = RuntimeError("Could not GET {}.".format(filename))
+            else:
+                e = RuntimeError("Could not read {}.".format(filename))
+            e.__cause__ = None
+            raise e
 
     # Syntax-highlight instead
     else:
