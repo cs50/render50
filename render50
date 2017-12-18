@@ -285,12 +285,12 @@ def cancel(code=0):
 
 
 def concatenate(output, inputs):
-    """Concatenate (PDF) inputs of specified size side by side."""
+    """Concatenate (PDF) inputs side by side."""
 
     # Read files
     readers = list(map(PdfFileReader, inputs))
 
-    # Render blank page
+    # Render blank page, inferring size from first input's first page
     temp = mkstemp()
     size = "{}pt {}pt".format(readers[0].getPage(0).mediaBox[2], readers[0].getPage(0).mediaBox[3])
     write(temp[1], [blank(size)], False)
