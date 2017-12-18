@@ -135,7 +135,7 @@ def main():
                 file = open(args.input[0], "rb")
                 page = file.read().decode("utf-8", "ignore")
             soup = BeautifulSoup(page, "html.parser")
-            framesets = soup.find_all("frameset")
+            framesets = soup.find_all("frameset", {"cols": re.compile("50%,\s*50%")})
             assert len(framesets) == 1
             frames = framesets[0].find_all("frame")
             assert 2 <= len(frames) <= 3
