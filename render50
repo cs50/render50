@@ -195,7 +195,7 @@ def main():
             write(temps[2][1], [document], False)
 
         # Concatenate inputs
-        concatenate(output, size, list(map(lambda f: f[1], temps)))
+        concatenate(output, list(map(lambda f: f[1], temps)))
 
         # Remove temporary files
         map(lambda f: os.close(f[0]), temps)
@@ -284,7 +284,7 @@ def cancel(code=0):
     sys.exit(code)
 
 
-def concatenate(output, size, inputs):
+def concatenate(output, inputs):
     """Concatenate (PDF) inputs of specified size side by side."""
 
     # Read files
@@ -292,6 +292,7 @@ def concatenate(output, size, inputs):
 
     # Render blank page
     temp = mkstemp()
+    size = "{}pt {}pt".format(readers[0].getPage(0).mediaBox[2], readers[0].getPage(0).mediaBox[3])
     write(temp[1], [blank(size)], False)
     page = PdfFileReader(temp[1]).getPage(0)
 
