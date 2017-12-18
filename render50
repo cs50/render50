@@ -529,7 +529,8 @@ except OSError as e:
         e.__cause__ = None
         raise e
 else:
-    # Temporary until https://github.com/Kozea/WeasyPrint/milestone/7 is confirmed as deployed
+    # Temporary until https://github.com/Kozea/WeasyPrint/issues/483 and
+    # https://github.com/Kozea/WeasyPrint/issues/553 are confirmed as resolved
     import weasyprint.layout.inlines
     weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
     import weasyprint.layout.preferred
