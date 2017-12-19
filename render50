@@ -414,11 +414,18 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
 
         # Render document
         try:
+
+            # Parse HTML
             soup = BeautifulSoup(get(filename), "html.parser")
+
+            # Remove relative links
             if not relative:
                 for a in soup.find_all("a"):
                     del a["href"]
+
+            # Re-parse HTML
             document = HTML(base_url=os.path.dirname(filename), string=str(soup)).render(stylesheets=stylesheets)
+
         except Exception as e:
             cprint("\033[2K", end="\r")
             if type(e) in [RequestException, URLFetchingError]:
