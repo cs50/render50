@@ -178,7 +178,7 @@ def main():
 
         # Render second input
         temps.append(mkstemp())
-        margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .25in .5in .25in"
+        margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .375in .5in .375in"
         document = render(args.input[1], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=margin, size=size)
         if not document:
