@@ -58,20 +58,20 @@ def main():
     signal(SIGINT, handler)
 
     # Parse command-line arguments
-    parser = ArgumentParser(description="A command-line tool that "
-                                                 "renders source code as a PDF.")
+    parser = ArgumentParser(description="A command-line tool that renders source code as a PDF.")
     parser.add_argument("-b", "--browser", action="store_true", help="render as a browser would")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
-    parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
+    parser.add_argument("-s",
+                        "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-y", "--side-by-side", action="store_true",
-                       help="render inputs side by side")
+                        help="render inputs side by side")
     parser.add_argument("input", help="file or URL to render", nargs="+")
     parser.add_argument("-V", "--version", action="version",
-                       version="%(prog)s {}".format(__version__))
+                        version="%(prog)s {}".format(__version__))
     args = parser.parse_args(sys.argv[1:])
 
     # Ensure output ends in .pdf
@@ -135,7 +135,8 @@ def main():
                 file = open(args.input[0], "rb")
                 page = file.read().decode("utf-8", "ignore")
             soup = BeautifulSoup(page, "html.parser")
-            framesets = soup.find_all("frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
+            framesets = soup.find_all(
+                "frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
             assert len(framesets) == 1
             frames = framesets[0].find_all("frame")
             assert 2 <= len(frames) <= 3
@@ -354,7 +355,7 @@ def join(a, b):
     # If b is a URL, don't join
     if b.startswith(("http://", "https://")):
         return b
-    
+
     # if a is a URL (and b is not), join with b
     if a.startswith(("http://", "https://")):
         return urljoin(a, b)
@@ -362,7 +363,7 @@ def join(a, b):
     # if a is an absolute or a relative path, join with b
     else:
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
- 
+
 
 def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in"):
     """Render file with filename as HTML page(s) of specified size."""
@@ -397,10 +398,12 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         if filename.startswith(("http", "https")):
 
             # Get from raw.githubusercontent.com
-            matches = re.search(r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
+            matches = re.search(
+                r"^(https?://github.com/[^/]+/[^/]+)/blob/(.+)$", filename)
             if matches:
                 filename = "{}/raw/{}".format(matches.group(1), matches.group(2))
-            matches = re.search(r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
+            matches = re.search(
+                r"^(https?://gist.github.com/[^/]+/[^/#]+/?)(?:#file-(.+))?$", filename)
             if matches:
                 filename = "{}/raw".format(matches.group(1))
                 if matches.group(2):
@@ -416,7 +419,7 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
 
         # Read file
         else:
-            try: 
+            try:
                 file = open(filename, "rb")
                 code = file.read().decode("utf-8", "ignore")
                 file.close()
@@ -490,7 +493,7 @@ def write(output, documents, echo=True):
 
 
 def _inline_min_content_width(context, box, outer=True, skip_stack=None,
-                             first_line=False, is_line_start=False):
+                              first_line=False, is_line_start=False):
     """Return the min-content width for an ``InlineBox``.
     The width is calculated from the lines from ``skip_stack``. If
     ``first_line`` is ``True``, only the first line minimum width is
