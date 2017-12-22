@@ -3,8 +3,8 @@
 from __future__ import print_function
 import os
 import re
-import sys
 import requests
+import sys
 import termcolor
 
 from argparse import ArgumentParser
