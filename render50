@@ -504,25 +504,6 @@ def write(output, documents, echo=True):
             cprint("Nothing to render.", "red")
 
 
-def _inline_min_content_width(context, box, outer=True, skip_stack=None,
-                              first_line=False, is_line_start=False):
-    """Return the min-content width for an ``InlineBox``.
-    The width is calculated from the lines from ``skip_stack``. If
-    ``first_line`` is ``True``, only the first line minimum width is
-    calculated.
-    """
-    widths = weasyprint.layout.preferred.inline_line_widths(
-        context, box, outer, is_line_start, minimum=True,
-        skip_stack=skip_stack)
-
-    if first_line:
-        widths = [next(widths)]
-    else:
-        widths = list(widths)
-        widths[-1] -= weasyprint.layout.preferred.trailing_whitespace_size(context, box)
-    return weasyprint.layout.preferred.adjust(box, outer, max(widths))
-
-
 # Check for dependencies
 # http://weasyprint.readthedocs.io/en/latest/install.html
 try:
@@ -543,13 +524,6 @@ except OSError as e:
         e = RuntimeError(str(e))
         e.__cause__ = None
         raise e
-else:
-    # Temporary until https://github.com/Kozea/WeasyPrint/issues/483 and
-    # https://github.com/Kozea/WeasyPrint/issues/553 are confirmed as resolved
-    import weasyprint.layout.inlines
-    weasyprint.layout.inlines.inline_min_content_width = _inline_min_content_width
-    import weasyprint.layout.preferred
-    weasyprint.layout.preferred.inline_min_content_width = _inline_min_content_width
 
 
 if __name__ == "__main__":
