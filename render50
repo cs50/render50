@@ -101,9 +101,7 @@ def main():
                 try:
                     os.makedirs(dirname)
                 except Exception:
-                    e = RuntimeError("Could not create {}.".format(dirname))
-                    e.__cause__ = None
-                    raise e
+                    raise RuntimeError("Could not create {}.".format(dirname))
 
     # Determine size
     # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
@@ -371,11 +369,9 @@ def get(file):
         except Exception as e:
             cprint("\033[2K", end="\r")
             if type(e) is FileNotFoundError:
-                e = RuntimeError("Could not find {}.".format(file))
+                raise RuntimeError("Could not find {}.".format(file))
             else:
-                e = RuntimeError("Could not read {}.".format(file))
-            e.__cause__ = None
-            raise e
+                raise RuntimeError("Could not read {}.".format(file))
 
 
 def join(a, b):
@@ -426,11 +422,9 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         except Exception as e:
             cprint("\033[2K", end="\r")
             if type(e) in [RequestException, URLFetchingError]:
-                e = RuntimeError("Could not GET {}.".format(filename))
+                raise RuntimeError("Could not GET {}.".format(filename))
             else:
-                e = RuntimeError("Could not read {}.".format(filename))
-            e.__cause__ = None
-            raise e
+                raise RuntimeError("Could not read {}.".format(filename))
 
     # Syntax-highlight instead
     else:
@@ -507,17 +501,11 @@ try:
     from weasyprint.urls import URLFetchingError
 except OSError as e:
     if "pangocairo" in str(e):
-        e = RuntimeError("Missing dependency. Install Pango.")
-        e.__cause__ = None
-        raise e
+        raise RuntimeError("Missing dependency. Install Pango.")
     elif "cairo" in str(e):
-        e = RuntimeError("Missing dependency. Install cairo.")
-        e.__cause__ = None
-        raise e
+        raise RuntimeError("Missing dependency. Install cairo.")
     else:
-        e = RuntimeError(str(e))
-        e.__cause__ = None
-        raise e
+        raise RuntimeError(str(e))
 
 
 if __name__ == "__main__":
