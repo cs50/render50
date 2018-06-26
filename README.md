@@ -3,9 +3,8 @@
 ## Usage
 
 ```
-pip install cli50
+pip3 install cli50
 cli50
-apt-get install -y libxml2-dev libxslt1-dev # Python 2
-pip install -e .
+pip3 install -e .
 ./render50
 ```
