@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 import os
@@ -24,19 +24,13 @@ from signal import SIGINT, signal
 from tempfile import mkstemp
 from textwrap import fill
 from traceback import print_exception
+from urllib.parse import urljoin
 from warnings import filterwarnings
 
 
-# Require Python 2.7+
-if sys.version_info < (2, 7):
-    sys.exit("You have an old version of python. Install version 2.7 or higher.")
-
-# Python 2 versus 3
-if sys.version_info < (3, 0):
-    input = raw_input
-    from urlparse import urljoin
-else:
-    from urllib.parse import urljoin
+# Require Python 3.6+
+if sys.version_info < (3, 6):
+    sys.exit("You have an old version of python. Install version 3.6 or higher.")
 
 # Get version
 try:
@@ -152,7 +146,7 @@ def main():
             write(output, [document])
             sys.exit(0)
 
-    # Render (2-3 inputs) side by side
+    # Render (2 or 3 inputs) side by side
     if args.side_by_side:
 
         # Divide width
@@ -238,7 +232,7 @@ def main():
             for dirpath, dirnames, filenames in os.walk(path):
                 for filename in filenames:
                     files.append(os.path.join(dirpath, filename))
-            natsorted(files, alg=ns.IGNORECASE)
+            files = natsorted(files, alg=ns.IGNORECASE)
             candidates += files
         else:
             raise RuntimeError("Could not recognize {}.".format(path))
