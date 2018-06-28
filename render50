@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 import os
@@ -24,19 +24,13 @@ from signal import SIGINT, signal
 from tempfile import mkstemp
 from textwrap import fill
 from traceback import print_exception
+from urllib.parse import urljoin
 from warnings import filterwarnings
 
 
-# Require Python 2.7+
-if sys.version_info < (2, 7):
-    sys.exit("You have an old version of python. Install version 2.7 or higher.")
-
-# Python 2 versus 3
-if sys.version_info < (3, 0):
-    input = raw_input
-    from urlparse import urljoin
-else:
-    from urllib.parse import urljoin
+# Require Python 3.6+
+if sys.version_info < (3, 6):
+    sys.exit("You have an old version of python. Install version 3.6 or higher.")
 
 # Get version
 try:
@@ -107,9 +101,7 @@ def main():
                 try:
                     os.makedirs(dirname)
                 except Exception:
-                    e = RuntimeError("Could not create {}.".format(dirname))
-                    e.__cause__ = None
-                    raise e
+                    raise RuntimeError("Could not create {}.".format(dirname))
 
     # Determine size
     # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
@@ -152,7 +144,7 @@ def main():
             write(output, [document])
             sys.exit(0)
 
-    # Render (2-3 inputs) side by side
+    # Render (2 or 3 inputs) side by side
     if args.side_by_side:
 
         # Divide width
@@ -238,7 +230,7 @@ def main():
             for dirpath, dirnames, filenames in os.walk(path):
                 for filename in filenames:
                     files.append(os.path.join(dirpath, filename))
-            natsorted(files, alg=ns.IGNORECASE)
+            files = natsorted(files, alg=ns.IGNORECASE)
             candidates += files
         else:
             raise RuntimeError("Could not recognize {}.".format(path))
@@ -377,11 +369,9 @@ def get(file):
         except Exception as e:
             cprint("\033[2K", end="\r")
             if type(e) is FileNotFoundError:
-                e = RuntimeError("Could not find {}.".format(file))
+                raise RuntimeError("Could not find {}.".format(file))
             else:
-                e = RuntimeError("Could not read {}.".format(file))
-            e.__cause__ = None
-            raise e
+                raise RuntimeError("Could not read {}.".format(file))
 
 
 def join(a, b):
@@ -432,11 +422,9 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         except Exception as e:
             cprint("\033[2K", end="\r")
             if type(e) in [RequestException, URLFetchingError]:
-                e = RuntimeError("Could not GET {}.".format(filename))
+                raise RuntimeError("Could not GET {}.".format(filename))
             else:
-                e = RuntimeError("Could not read {}.".format(filename))
-            e.__cause__ = None
-            raise e
+                raise RuntimeError("Could not read {}.".format(filename))
 
     # Syntax-highlight instead
     else:
@@ -513,17 +501,11 @@ try:
     from weasyprint.urls import URLFetchingError
 except OSError as e:
     if "pangocairo" in str(e):
-        e = RuntimeError("Missing dependency. Install Pango.")
-        e.__cause__ = None
-        raise e
+        raise RuntimeError("Missing dependency. Install Pango.")
     elif "cairo" in str(e):
-        e = RuntimeError("Missing dependency. Install cairo.")
-        e.__cause__ = None
-        raise e
+        raise RuntimeError("Missing dependency. Install cairo.")
     else:
-        e = RuntimeError(str(e))
-        e.__cause__ = None
-        raise e
+        raise RuntimeError(str(e))
 
 
 if __name__ == "__main__":
