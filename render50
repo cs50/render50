@@ -16,7 +16,7 @@ from natsort import natsorted, ns
 from pkg_resources import DistributionNotFound, get_distribution
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
-from pygments.lexers import guess_lexer, guess_lexer_for_filename
+from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from requests.exceptions import RequestException
@@ -115,7 +115,7 @@ def main():
     else:
         size = args.size.strip()
 
-    # Render (1 input) as browser would
+    # Render (1 input) as browser would, effectively screenshotting page
     if args.browser:
 
         # frameset
@@ -410,10 +410,11 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             # Parse HTML
             soup = BeautifulSoup(get(filename), "html.parser")
 
-            # Remove relative links
+            # Remove relative links (for side-by-side outputs, for which we concatenate PDFs page-wise)
             if not relative:
                 for a in soup.find_all("a"):
-                    del a["href"]
+                    if a["href"].startswith("#"):
+                        del a["href"]
 
             # Re-parse HTML
             document = HTML(base_url=os.path.dirname(filename),
@@ -442,7 +443,7 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
         if code.strip() and color:
             try:
-                lexer = guess_lexer_for_filename(filename, code)
+                lexer = get_lexer_for_filename(filename)
             except:
                 try:
                     assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
