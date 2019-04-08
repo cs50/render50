@@ -92,7 +92,7 @@ def main():
             raise RuntimeError("Too many files to render side by side.")
 
         # Expect 0, 2, or 3 titles
-        if len(args.title) < len(args.input):
+        if args.title and len(args.title) < len(args.input):
             raise RuntimeError("Too few titles to render side by side.")
         elif len(args.title) > len(args.input):
             raise RuntimeError("Too many titles to render side by side.")
@@ -173,7 +173,7 @@ def main():
         # Render first input
         temps.append(mkstemp())
         document = render(args.input[0], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size, title=args.title[0])
+                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size, title=args.title[0] if args.title else None)
         if not document:
             cancel(1)
         write(temps[0][1], [document], False)
@@ -182,7 +182,7 @@ def main():
         temps.append(mkstemp())
         margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .375in .5in .375in"
         document = render(args.input[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=margin, relative=False, size=size, title=args.title[1])
+                          fontSize="8pt", margin=margin, relative=False, size=size, title=args.title[1] if args.title else None)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
