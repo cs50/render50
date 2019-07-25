@@ -488,7 +488,7 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         document = HTML(string=string).render(stylesheets=stylesheets)
 
     # Bookmark document
-    document.pages[0].bookmarks = [(1, filename, (0, 0))]
+    document.pages[0].bookmarks = [(1, filename, (0, 0), "closed")]
 
     # Rendered
     cprint("\033[2K", end="\r")
