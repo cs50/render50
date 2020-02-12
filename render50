@@ -64,7 +64,7 @@ def main():
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-t", "--title", default=[], help="title atop page", nargs="*")
     parser.add_argument("-y", "--side-by-side", action="store_true", help="render inputs side by side")
-    parser.add_argument("input", help="file or URL to render", nargs="+")
+    parser.add_argument("INPUT", help="file or URL to render", nargs="*")
     parser.add_argument("-V", "--version", action="version", version="%(prog)s {}".format(__version__))
     args = parser.parse_args(sys.argv[1:])
 
@@ -73,8 +73,16 @@ def main():
     if not output.lower().endswith(".pdf"):
         output += ".pdf"
 
+    # Check for input
+    if args.INPUT:
+        inputs = args.INPUT
+    else:
+        inputs = [line.strip() for line in sys.stdin.readlines()]
+
     # Prompt whether to overwrite file as needed
     if os.path.exists(output):
+        if not args.INPUT:
+            raise RuntimeError("Output exists.")
         while True:
             s = input("Overwrite {}? ".format(output))
             if s.lower() in ["y", "yes"]:
@@ -86,15 +94,15 @@ def main():
     if args.side_by_side:
 
         # Expect 2 or 3 inputs
-        if len(args.input) < 2:
+        if len(inputs) < 2:
             raise RuntimeError("Too few files to render side by side.")
-        elif len(args.input) > 3:
+        elif len(inputs) > 3:
             raise RuntimeError("Too many files to render side by side.")
 
         # Expect 0, 2, or 3 titles
-        if args.title and len(args.title) < len(args.input):
+        if args.title and len(args.title) < len(inputs):
             raise RuntimeError("Too few titles to render side by side.")
-        elif len(args.title) > len(args.input):
+        elif len(args.title) > len(inputs):
             raise RuntimeError("Too many titles to render side by side.")
 
     # If not
@@ -134,7 +142,7 @@ def main():
 
         # frameset
         try:
-            page = get(args.input[0])
+            page = get(inputs[0])
             soup = BeautifulSoup(page, "html.parser")
             framesets = soup.find_all(
                 "frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
@@ -144,13 +152,13 @@ def main():
             if not args.size:
                 size = "letter landscape"
             args.side_by_side = True
-            args.input = [join(args.input[0], frame.attrs["src"]) for frame in frames]
+            inputs = [join(inputs[0], frame.attrs["src"]) for frame in frames]
 
         # noframes
         except:
 
             # Render input
-            document = render(args.input[0], browser=True, size=size, title=args.title[0] if args.title else None)
+            document = render(inputs[0], browser=True, size=size, title=args.title[0] if args.title else None)
             if not document:
                 cancel(1)
 
@@ -163,7 +171,7 @@ def main():
 
         # Divide width
         document = blank(size)
-        width = int(document.pages[0].width / len(args.input))
+        width = int(document.pages[0].width / len(inputs))
         height = int(document.pages[0].height)
         size = "{}px {}px".format(width, height)
 
@@ -172,7 +180,7 @@ def main():
 
         # Render first input
         temps.append(mkstemp())
-        document = render(args.input[0], browser=args.browser, color=not args.no_color,
+        document = render(inputs[0], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size, title=args.title[0] if args.title else None)
         if not document:
             cancel(1)
@@ -180,17 +188,17 @@ def main():
 
         # Render second input
         temps.append(mkstemp())
-        margin = ".5in .5in .5in .25in" if len(args.input) == 2 else ".5in .375in .5in .375in"
-        document = render(args.input[1], browser=args.browser, color=not args.no_color,
+        margin = ".5in .5in .5in .25in" if len(inputs) == 2 else ".5in .375in .5in .375in"
+        document = render(inputs[1], browser=args.browser, color=not args.no_color,
                           fontSize="8pt", margin=margin, relative=False, size=size, title=args.title[1] if args.title else None)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
 
         # Render third input, if any
-        if len(args.input) == 3:
+        if len(inputs) == 3:
             temps.append(mkstemp())
-            document = render(args.input[2], browser=args.browser, color=not args.no_color,
+            document = render(inputs[2], browser=args.browser, color=not args.no_color,
                               fontSize="8pt", margin=".5in .5in .5in .25in", relative=False, size=size, title=args.title[2])
             if not document:
                 cancel(1)
@@ -221,10 +229,10 @@ def main():
 
     # Check stdin for inputs else command line
     patterns = []
-    if len(args.input) == 1 and args.input[0] == "-":
+    if len(inputs) == 1 and inputs[0] == "-":
         patterns = sys.stdin.read().splitlines()
     else:
-        patterns = args.input
+        patterns = inputs
 
     # Glob patterns lest shell (e.g., Windows) not have done so, ignoring empty patterns
     paths = []
