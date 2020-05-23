@@ -62,7 +62,6 @@ def main():
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
-    parser.add_argument("-t", "--title", default=[], help="title atop page", nargs="*")
     parser.add_argument("-y", "--side-by-side", action="store_true", help="render inputs side by side")
     parser.add_argument("INPUT", help="file or URL to render", nargs="*")
     parser.add_argument("-V", "--version", action="version", version="%(prog)s {}".format(__version__))
@@ -98,19 +97,6 @@ def main():
             raise RuntimeError("Too few files to render side by side.")
         elif len(inputs) > 3:
             raise RuntimeError("Too many files to render side by side.")
-
-        # Expect 0, 2, or 3 titles
-        if args.title and len(args.title) < len(inputs):
-            raise RuntimeError("Too few titles to render side by side.")
-        elif len(args.title) > len(inputs):
-            raise RuntimeError("Too many titles to render side by side.")
-
-    # If not
-    else:
-
-        # Expect 0 or 1 title
-        if len(args.title) > 1:
-            raise RuntimeError("Too many titles.")
 
     # Create parent directory as needed
     dirname = os.path.dirname(os.path.realpath(output))
@@ -158,7 +144,7 @@ def main():
         except:
 
             # Render input
-            document = render(inputs[0], browser=True, size=size, title=args.title[0] if args.title else None)
+            document = render(inputs[0], browser=True, size=size)
             if not document:
                 cancel(1)
 
@@ -181,7 +167,7 @@ def main():
         # Render first input
         temps.append(mkstemp())
         document = render(inputs[0], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size, title=args.title[0] if args.title else None)
+                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size)
         if not document:
             cancel(1)
         write(temps[0][1], [document], False)
@@ -190,7 +176,7 @@ def main():
         temps.append(mkstemp())
         margin = ".5in .5in .5in .25in" if len(inputs) == 2 else ".5in .375in .5in .375in"
         document = render(inputs[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=margin, relative=False, size=size, title=args.title[1] if args.title else None)
+                          fontSize="8pt", margin=margin, relative=False, size=size)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
@@ -199,7 +185,7 @@ def main():
         if len(inputs) == 3:
             temps.append(mkstemp())
             document = render(inputs[2], browser=args.browser, color=not args.no_color,
-                              fontSize="8pt", margin=".5in .5in .5in .25in", relative=False, size=size, title=args.title[2])
+                              fontSize="8pt", margin=".5in .5in .5in .25in", relative=False, size=size)
             if not document:
                 cancel(1)
             write(temps[2][1], [document], False)
@@ -275,7 +261,7 @@ def main():
     # Render queued files
     documents = []
     for queued in queue:
-        document = render(queued, color=not args.no_color, size=size, title=args.title[0] if args.title else None)
+        document = render(queued, color=not args.no_color, size=size)
         if document:
             documents.append(document)
 
@@ -412,7 +398,7 @@ def join(a, b):
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
 
 
-def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", relative=True, title=None):
+def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", relative=True):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
@@ -477,15 +463,11 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             string = highlight(code, TextLexer(), HtmlFormatter(
                 linenos="inline", nobackground=True))
 
-        # Title for document
-        if not title:
-            title = filename
-
         # Styles for document
         stylesheets = [
             CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
-                title.replace("'", "\'"))),
+                filename.replace("'", "\'"))),
             CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
             CSS(string=HtmlFormatter().get_style_defs('.highlight')),
             CSS(string=".highlight { background: initial; }"),
