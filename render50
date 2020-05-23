@@ -59,10 +59,10 @@ def main():
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
+    parser.add_argument("-P", "--no-path", action="store_true", default=False, help="omit paths in headers")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
-    parser.add_argument("-t", "--title", default=[], help="title atop page", nargs="*")
     parser.add_argument("-y", "--side-by-side", action="store_true", help="render inputs side by side")
     parser.add_argument("INPUT", help="file or URL to render", nargs="*")
     parser.add_argument("-V", "--version", action="version", version="%(prog)s {}".format(__version__))
@@ -78,142 +78,6 @@ def main():
         inputs = args.INPUT
     else:
         inputs = [line.strip() for line in sys.stdin.readlines()]
-
-    # Prompt whether to overwrite file as needed
-    if os.path.exists(output):
-        if not args.INPUT:
-            raise RuntimeError("Output exists.")
-        while True:
-            s = input("Overwrite {}? ".format(output))
-            if s.lower() in ["y", "yes"]:
-                break
-            elif s.lower() in ["n", "no"]:
-                cancel()
-
-    # If side-by-side
-    if args.side_by_side:
-
-        # Expect 2 or 3 inputs
-        if len(inputs) < 2:
-            raise RuntimeError("Too few files to render side by side.")
-        elif len(inputs) > 3:
-            raise RuntimeError("Too many files to render side by side.")
-
-        # Expect 0, 2, or 3 titles
-        if args.title and len(args.title) < len(inputs):
-            raise RuntimeError("Too few titles to render side by side.")
-        elif len(args.title) > len(inputs):
-            raise RuntimeError("Too many titles to render side by side.")
-
-    # If not
-    else:
-
-        # Expect 0 or 1 title
-        if len(args.title) > 1:
-            raise RuntimeError("Too many titles.")
-
-    # Create parent directory as needed
-    dirname = os.path.dirname(os.path.realpath(output))
-    if not os.path.isdir(dirname):
-        while True:
-            s = input("Create {}? ".format(dirname)).strip()
-            if s.lower() in ["n", "no"]:
-                cancel()
-            elif s.lower() in ["y", "yes"]:
-                try:
-                    os.makedirs(dirname)
-                except Exception:
-                    raise RuntimeError("Could not create {}.".format(dirname))
-
-    # Determine size
-    # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
-    if not args.size:
-        if args.browser:
-            size = "letter portrait"
-        else:
-            size = "letter landscape"
-    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
-        size = "{} landscape".format(args.size)
-    else:
-        size = args.size.strip()
-
-    # Render (1 input) as browser would, effectively screenshotting page
-    if args.browser:
-
-        # frameset
-        try:
-            page = get(inputs[0])
-            soup = BeautifulSoup(page, "html.parser")
-            framesets = soup.find_all(
-                "frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
-            assert len(framesets) == 1
-            frames = framesets[0].find_all("frame")
-            assert 2 <= len(frames) <= 3
-            if not args.size:
-                size = "letter landscape"
-            args.side_by_side = True
-            inputs = [join(inputs[0], frame.attrs["src"]) for frame in frames]
-
-        # noframes
-        except:
-
-            # Render input
-            document = render(inputs[0], browser=True, size=size, title=args.title[0] if args.title else None)
-            if not document:
-                cancel(1)
-
-            # Write rendered output
-            write(output, [document])
-            sys.exit(0)
-
-    # Render (2 or 3 inputs) side by side
-    if args.side_by_side:
-
-        # Divide width
-        document = blank(size)
-        width = int(document.pages[0].width / len(inputs))
-        height = int(document.pages[0].height)
-        size = "{}px {}px".format(width, height)
-
-        # temporary files
-        temps = []
-
-        # Render first input
-        temps.append(mkstemp())
-        document = render(inputs[0], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size, title=args.title[0] if args.title else None)
-        if not document:
-            cancel(1)
-        write(temps[0][1], [document], False)
-
-        # Render second input
-        temps.append(mkstemp())
-        margin = ".5in .5in .5in .25in" if len(inputs) == 2 else ".5in .375in .5in .375in"
-        document = render(inputs[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=margin, relative=False, size=size, title=args.title[1] if args.title else None)
-        if not document:
-            cancel(1)
-        write(temps[1][1], [document], False)
-
-        # Render third input, if any
-        if len(inputs) == 3:
-            temps.append(mkstemp())
-            document = render(inputs[2], browser=args.browser, color=not args.no_color,
-                              fontSize="8pt", margin=".5in .5in .5in .25in", relative=False, size=size, title=args.title[2])
-            if not document:
-                cancel(1)
-            write(temps[2][1], [document], False)
-
-        # Concatenate inputs
-        concatenate(output, list(map(lambda f: f[1], temps)))
-
-        # Remove temporary files
-        map(lambda f: os.close(f[0]), temps)
-        map(lambda f: os.remove(f[1]), temps)
-
-        # Rendered
-        cprint("Rendered {}.".format(output), "green")
-        sys.exit(0)
 
     # Check for includes
     includes = []
@@ -272,10 +136,140 @@ def main():
         # Queue candidate for rendering
         queue.append(candidate)
 
+    # If side-by-side
+    if args.side_by_side:
+
+        # Expect 2 or 3 inputs
+        if len(queue) < 2:
+            raise RuntimeError("Too few files to render side by side.")
+        elif len(queue) > 3:
+            raise RuntimeError("Too many files to render side by side.")
+
+    # If rendering as browser would
+    if args.browser:
+
+        # Expect 1 input
+        if len(queue) != 1:
+            raise RuntimeError("Can only render one input as browser would.")
+
+    # Prompt whether to overwrite output
+    if os.path.exists(output):
+        if not args.INPUT:  # If using stdin for inputs
+            raise RuntimeError("Output exists.")
+        while True:
+            s = input("Overwrite {}? ".format(output))
+            if s.lower() in ["y", "yes"]:
+                break
+            elif s.lower() in ["n", "no"]:
+                cancel()
+
+    # Create parent directory as needed
+    dirname = os.path.dirname(os.path.realpath(output))
+    if not os.path.isdir(dirname):
+        while True:
+            s = input("Create {}? ".format(dirname)).strip()
+            if s.lower() in ["n", "no"]:
+                cancel()
+            elif s.lower() in ["y", "yes"]:
+                try:
+                    os.makedirs(dirname)
+                except Exception:
+                    raise RuntimeError("Could not create {}.".format(dirname))
+
+    # Determine size
+    # https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size
+    if not args.size:
+        if args.browser:
+            size = "letter portrait"
+        else:
+            size = "letter landscape"
+    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
+        size = "{} landscape".format(args.size)
+    else:
+        size = args.size.strip()
+
+    # Render input as browser would, effectively screenshotting page
+    if args.browser:
+
+        # frameset
+        try:
+            page = get(queue[0])
+            soup = BeautifulSoup(page, "html.parser")
+            framesets = soup.find_all(
+                "frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
+            assert len(framesets) == 1
+            frames = framesets[0].find_all("frame")
+            assert 2 <= len(frames) <= 3
+            if not args.size:
+                size = "letter landscape"
+            args.side_by_side = True
+            queue = [join(queue[0], frame.attrs["src"]) for frame in frames]
+
+        # noframes
+        except:
+
+            # Render input
+            document = render(queue[0], browser=True, size=size)
+            if not document:
+                cancel(1)
+
+            # Write rendered output
+            write(output, [document])
+            sys.exit(0)
+
+    # Render inputs side by side
+    if args.side_by_side:
+
+        # Divide width
+        document = blank(size)
+        width = int(document.pages[0].width / len(queue))
+        height = int(document.pages[0].height)
+        size = "{}px {}px".format(width, height)
+
+        # temporary files
+        temps = []
+
+        # Render first input
+        temps.append(mkstemp())
+        document = render(queue[0], browser=args.browser, color=not args.no_color,
+                          fontSize="8pt", margin=".5in .25in .5in .5in", path=not args.no_path, relative=False, size=size)
+        if not document:
+            cancel(1)
+        write(temps[0][1], [document], False)
+
+        # Render second input
+        temps.append(mkstemp())
+        margin = ".5in .5in .5in .25in" if len(queue) == 2 else ".5in .375in .5in .375in"
+        document = render(queue[1], browser=args.browser, color=not args.no_color,
+                          fontSize="8pt", margin=margin, path=not args.no_path, relative=False, size=size)
+        if not document:
+            cancel(1)
+        write(temps[1][1], [document], False)
+
+        # Render third input, if any
+        if len(queue) == 3:
+            temps.append(mkstemp())
+            document = render(queue[2], browser=args.browser, color=not args.no_color,
+                              fontSize="8pt", margin=".5in .5in .5in .25in", path=not args.no_path, relative=False, size=size)
+            if not document:
+                cancel(1)
+            write(temps[2][1], [document], False)
+
+        # Concatenate inputs
+        concatenate(output, list(map(lambda f: f[1], temps)))
+
+        # Remove temporary files
+        map(lambda f: os.close(f[0]), temps)
+        map(lambda f: os.remove(f[1]), temps)
+
+        # Rendered
+        cprint("Rendered {}.".format(output), "green")
+        sys.exit(0)
+
     # Render queued files
     documents = []
     for queued in queue:
-        document = render(queued, color=not args.no_color, size=size, title=args.title[0] if args.title else None)
+        document = render(queued, color=not args.no_color, path=not args.no_path, size=size)
         if document:
             documents.append(document)
 
@@ -412,7 +406,7 @@ def join(a, b):
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
 
 
-def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", relative=True, title=None):
+def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", path=True, relative=True):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
@@ -477,11 +471,8 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             string = highlight(code, TextLexer(), HtmlFormatter(
                 linenos="inline", nobackground=True))
 
-        # Title for document
-        if not title:
-            title = filename
-
         # Styles for document
+        title = filename if path else os.path.basename(filename)
         stylesheets = [
             CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
