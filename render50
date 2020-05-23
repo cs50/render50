@@ -59,6 +59,7 @@ def main():
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
+    parser.add_argument("-P", "--no-path", action="store_true", default=False, help="omit paths in headers")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
@@ -231,7 +232,7 @@ def main():
         # Render first input
         temps.append(mkstemp())
         document = render(queue[0], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .25in .5in .5in", relative=False, size=size)
+                          fontSize="8pt", margin=".5in .25in .5in .5in", path=not args.no_path, relative=False, size=size)
         if not document:
             cancel(1)
         write(temps[0][1], [document], False)
@@ -240,7 +241,7 @@ def main():
         temps.append(mkstemp())
         margin = ".5in .5in .5in .25in" if len(queue) == 2 else ".5in .375in .5in .375in"
         document = render(queue[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=margin, relative=False, size=size)
+                          fontSize="8pt", margin=margin, path=not args.no_path, relative=False, size=size)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
@@ -249,7 +250,7 @@ def main():
         if len(queue) == 3:
             temps.append(mkstemp())
             document = render(queue[2], browser=args.browser, color=not args.no_color,
-                              fontSize="8pt", margin=".5in .5in .5in .25in", relative=False, size=size)
+                              fontSize="8pt", margin=".5in .5in .5in .25in", path=not args.no_path, relative=False, size=size)
             if not document:
                 cancel(1)
             write(temps[2][1], [document], False)
@@ -268,7 +269,7 @@ def main():
     # Render queued files
     documents = []
     for queued in queue:
-        document = render(queued, color=not args.no_color, size=size)
+        document = render(queued, color=not args.no_color, path=not args.no_path, size=size)
         if document:
             documents.append(document)
 
@@ -405,7 +406,7 @@ def join(a, b):
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
 
 
-def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", relative=True):
+def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", path=True, relative=True):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
@@ -471,10 +472,11 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
                 linenos="inline", nobackground=True))
 
         # Styles for document
+        title = filename if path else os.path.basename(filename)
         stylesheets = [
             CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
-                filename.replace("'", "\'"))),
+                title.replace("'", "\'"))),
             CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
             CSS(string=HtmlFormatter().get_style_defs('.highlight')),
             CSS(string=".highlight { background: initial; }"),
