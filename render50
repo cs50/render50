@@ -214,7 +214,9 @@ def main():
                 cancel(1)
 
             # Write rendered output
-            write(output, [document])
+            if not write(output, [document]):
+                cancel(1)
+            cprint("Rendered {}.".format(output), "green")
             sys.exit(0)
 
     # Render inputs side by side
@@ -274,7 +276,8 @@ def main():
             documents.append(document)
 
     # Write rendered files
-    write(output, documents)
+    if not write(output, documents):
+        cancel(1)
 
 
 def blank(size):
@@ -505,9 +508,9 @@ def write(output, documents, echo=True):
         documents[0].copy(pages).write_pdf(output)
         if echo:
             cprint("Rendered {}.".format(output), "green")
+        return True
     else:
-        if echo:
-            cprint("Nothing to render.", "red")
+        return False
 
 
 # Check for dependencies
