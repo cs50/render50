@@ -183,10 +183,12 @@ def main():
             size = "letter portrait"
         else:
             size = "letter landscape"
-    elif args.size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
-        size = "{} landscape".format(args.size)
     else:
         size = args.size.strip()
+        if not re.search(r"^[A-Za-z0-9\- ]+$", size):
+            raise RuntimeError("Invalid size.")
+        if size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
+            size = "{} landscape".format(size)
 
     # Render input as browser would, effectively screenshotting page
     if args.browser:
