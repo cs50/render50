@@ -216,6 +216,8 @@ def main():
             # Write rendered output
             if not write(output, [document]):
                 cancel(1)
+            cprint("Rendered {}.".format(output), "green")
+            sys.exit(0)
 
     # Render inputs side by side
     if args.side_by_side:
