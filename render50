@@ -324,7 +324,7 @@ def concatenate(output, inputs):
     os.close(temp[0]), os.remove(temp[1])
 
 
-def cprint(text="", color=None, on_color=None, attrs=None, end="\n", file=sys.stdout):
+def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
@@ -342,9 +342,9 @@ def excepthook(type, value, tb):
     """Report an exception."""
     excepthook.ignore = False
     if type is RuntimeError and str(value):
-        cprint(str(value), "yellow", file=sys.stderr)
+        cprint(str(value), "yellow")
     else:
-        cprint("Sorry, something's wrong! Let sysadmins@cs50.harvard.edu know!", "yellow", file=sys.stderr)
+        cprint("Sorry, something's wrong! Let sysadmins@cs50.harvard.edu know!", "yellow")
         print_exception(type, value, tb)
     cancel(1)
 
@@ -451,7 +451,7 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
         # Check whether binary file
         if "\x00" in code:
             cprint("\033[2K", end="\r")
-            cprint("Could not render {} because binary.".format(filename), "yellow", file=sys.stderr)
+            cprint("Could not render {} because binary.".format(filename), "yellow")
             return None
 
         # Highlight code unless file is empty, using inline line numbers to avoid
