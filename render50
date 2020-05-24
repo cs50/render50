@@ -334,7 +334,7 @@ def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
 
     # Print text, flushing output
     termcolor.cprint(fill(text, columns, drop_whitespace=False, replace_whitespace=False),
-                     color=color, on_color=on_color, attrs=attrs, end=end, file=file)
+                     color=color, on_color=on_color, attrs=attrs, end=end)
     sys.stdout.flush()
 
 
