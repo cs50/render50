@@ -11,6 +11,7 @@ import termcolor
 
 from argparse import ArgumentParser
 from backports.shutil_get_terminal_size import get_terminal_size
+from braceexpand import braceexpand
 from bs4 import BeautifulSoup
 from copy import copy
 from glob import glob
@@ -97,13 +98,14 @@ def main():
     else:
         patterns = inputs
 
-    # Glob patterns lest shell (e.g., Windows) not have done so, ignoring empty patterns
+    # Glob patterns lest shell (e.g., Windows) or stdin not have done so, ignoring empty patterns
     paths = []
     for pattern in patterns:
         if pattern.startswith(("http", "https")):
             paths += [pattern]
         if pattern:
-            paths += natsorted(glob(pattern), alg=ns.IGNORECASE)
+            for expression in list(braceexpand(pattern)):
+                paths += natsorted(glob(expression, recursive=True), alg=ns.IGNORECASE)
 
     # Candidates to render
     candidates = []
