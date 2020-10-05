@@ -486,8 +486,8 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
             CSS(string=HtmlFormatter().get_style_defs('.highlight')),
             CSS(string=".highlight { background: initial; }"),
-            CSS(string=".lineno { color: #808080; }"),
-            CSS(string=".lineno:after { content: '  '; }")]
+            CSS(string="span.linenos { background-color: inherit; color: #808080; }"),
+            CSS(string="span.linenos:after { content: '  '; }")]
 
         # Render document
         document = HTML(string=string).render(stylesheets=stylesheets)
