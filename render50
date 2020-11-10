@@ -56,6 +56,7 @@ def main():
     # Parse command-line arguments
     parser = ArgumentParser(description="A command-line tool that renders source code as a PDF.")
     parser.add_argument("-b", "--browser", action="store_true", help="render as a browser would")
+    parser.add_argument("-f", "--force", action="store_true", default=False, help="overwrite existing files without prompting")
     parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
@@ -153,8 +154,9 @@ def main():
         if len(queue) != 1:
             raise RuntimeError("Can only render one input as browser would.")
 
+
     # Prompt whether to overwrite output
-    if os.path.exists(output):
+    if not args.force and os.path.exists(output):
         if not args.INPUT:  # If using stdin for inputs
             raise RuntimeError("Output exists.")
         while True:
