@@ -221,7 +221,6 @@ def main():
             # Write rendered output
             if not write(output, [document]):
                 cancel(1)
-            cprint("Rendered {}.".format(output), "green")
             sys.exit(0)
 
     # Render inputs side by side
@@ -420,6 +419,9 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
     # Rendering
     cprint("Rendering {}...".format(filename), end="")
 
+    # Determine title
+    title = filename if path else os.path.basename(filename)
+    
     # Render as a browser would
     if browser:
 
@@ -480,7 +482,6 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
                 linenos="inline", nobackground=True))
 
         # Styles for document
-        title = filename if path else os.path.basename(filename)
         stylesheets = [
             CSS(string="@page {{ border-top: 1px #808080 solid; margin: {}; padding-top: 1em; size: {}; }}".format(margin, size)),
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
