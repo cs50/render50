@@ -21,6 +21,7 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
+from pygments.styles import get_all_styles
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from requests.exceptions import RequestException
 from tempfile import mkstemp
@@ -57,12 +58,12 @@ def main():
     parser = ArgumentParser(description="A command-line tool that renders source code as a PDF.")
     parser.add_argument("-b", "--browser", action="store_true", help="render as a browser would")
     parser.add_argument("-f", "--force", action="store_true", default=False, help="overwrite existing files without prompting")
-    parser.add_argument("-C", "--no-color", action="store_true", help="disable syntax highlighting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
     parser.add_argument("-P", "--no-path", action="store_true", default=False, help="omit paths in headers")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--size", help="size of page, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size")
+    parser.add_argument("-S", "--style", default="default", help="style of syntax highlighting, per https://pygments.org/demo/#try")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-y", "--side-by-side", action="store_true", help="render inputs side by side")
     parser.add_argument("INPUT", help="file or URL to render", nargs="*")
@@ -154,7 +155,6 @@ def main():
         if len(queue) != 1:
             raise RuntimeError("Can only render one input as browser would.")
 
-
     # Prompt whether to overwrite output
     if not args.force and os.path.exists(output):
         if not args.INPUT:  # If using stdin for inputs
@@ -192,6 +192,12 @@ def main():
             raise RuntimeError("Invalid size.")
         if size in ["A5", "A4", "A3", "B5", "B4", "JIS-B5", "JIS-B4", "letter", "legal", "ledger"]:
             size = "{} landscape".format(size)
+
+    # Validate style
+    if args.style and args.style not in get_all_styles():
+        raise RuntimeError("Invalid style: {}.".format(args.style))
+    elif args.style == "":
+        args.style = None
 
     # Render input as browser would, effectively screenshotting page
     if args.browser:
@@ -237,8 +243,8 @@ def main():
 
         # Render first input
         temps.append(mkstemp())
-        document = render(queue[0], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=".5in .25in .5in .5in", path=not args.no_path, relative=False, size=size)
+        document = render(queue[0], browser=args.browser, fontSize="8pt", 
+                          margin=".5in .25in .5in .5in", path=not args.no_path, relative=False, size=size, style=args.style)
         if not document:
             cancel(1)
         write(temps[0][1], [document], False)
@@ -246,8 +252,8 @@ def main():
         # Render second input
         temps.append(mkstemp())
         margin = ".5in .5in .5in .25in" if len(queue) == 2 else ".5in .375in .5in .375in"
-        document = render(queue[1], browser=args.browser, color=not args.no_color,
-                          fontSize="8pt", margin=margin, path=not args.no_path, relative=False, size=size)
+        document = render(queue[1], browser=args.browser, fontSize="8pt", 
+                          margin=margin, path=not args.no_path, relative=False, size=size, style=args.style)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
@@ -255,8 +261,8 @@ def main():
         # Render third input, if any
         if len(queue) == 3:
             temps.append(mkstemp())
-            document = render(queue[2], browser=args.browser, color=not args.no_color,
-                              fontSize="8pt", margin=".5in .5in .5in .25in", path=not args.no_path, relative=False, size=size)
+            document = render(queue[2], browser=args.browser, fontSize="8pt",
+                              margin=".5in .5in .5in .25in", path=not args.no_path, relative=False, size=size, style=args.style)
             if not document:
                 cancel(1)
             write(temps[2][1], [document], False)
@@ -275,7 +281,7 @@ def main():
     # Render queued files
     documents = []
     for queued in queue:
-        document = render(queued, color=not args.no_color, path=not args.no_path, size=size)
+        document = render(queued, path=not args.no_path, size=size, style=args.style)
         if document:
             documents.append(document)
 
@@ -413,7 +419,7 @@ def join(a, b):
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
 
 
-def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".5in", path=True, relative=True):
+def render(filename, size, browser=False, fontSize="10pt", margin=".5in", path=True, relative=True, style=None):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
@@ -467,19 +473,15 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
 
         # Highlight code unless file is empty, using inline line numbers to avoid
         # page breaks in tables, https://github.com/Kozea/WeasyPrint/issues/36
-        if code.strip() and color:
+        try:
+            lexer = get_lexer_for_filename(filename)
+        except:
             try:
-                lexer = get_lexer_for_filename(filename)
+                assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
+                lexer = guess_lexer(code.splitlines()[0])
             except:
-                try:
-                    assert code.startswith("#!")  # else, e.g., a .gitignore file with a dotfile is mistaken by GasLexer
-                    lexer = guess_lexer(code.splitlines()[0])
-                except:
-                    lexer = TextLexer()
-            string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
-        else:
-            string = highlight(code, TextLexer(), HtmlFormatter(
-                linenos="inline", nobackground=True))
+                lexer = TextLexer()
+        string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
 
         # Styles for document
         stylesheets = [
@@ -487,7 +489,7 @@ def render(filename, size, browser=False, color=True, fontSize="10pt", margin=".
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
                 title.replace("'", "\'"))),
             CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
-            CSS(string=HtmlFormatter().get_style_defs('.highlight')),
+            CSS(string=HtmlFormatter(style=style).get_style_defs('.highlight') if style else ""),
             CSS(string=".highlight { background: initial; }"),
             CSS(string="span.linenos { background-color: inherit; color: #808080; }"),
             CSS(string="span.linenos:after { content: '  '; }")]
