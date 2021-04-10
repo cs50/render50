@@ -196,6 +196,8 @@ def main():
     # Validate style
     if args.style and args.style not in get_all_styles():
         raise RuntimeError("Invalid style: {}.".format(args.style))
+    elif args.style == "":
+        args.style = None
 
     # Render input as browser would, effectively screenshotting page
     if args.browser:
@@ -487,7 +489,7 @@ def render(filename, size, browser=False, fontSize="10pt", margin=".5in", path=T
             CSS(string="@page {{ @top-right {{ color: #808080; content: '{}'; padding-bottom: 1em; vertical-align: bottom; }} }}".format(
                 title.replace("'", "\'"))),
             CSS(string="* {{ font-family: monospace; font-size: {}; margin: 0; overflow-wrap: break-word; white-space: pre-wrap; }}".format(fontSize)),
-            CSS(string=HtmlFormatter(style=style).get_style_defs('.highlight')),
+            CSS(string=HtmlFormatter(style=style).get_style_defs('.highlight') if style else ""),
             CSS(string=".highlight { background: initial; }"),
             CSS(string="span.linenos { background-color: inherit; color: #808080; }"),
             CSS(string="span.linenos:after { content: '  '; }")]
