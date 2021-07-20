@@ -244,16 +244,23 @@ def main():
         # Render first input
         temps.append(mkstemp())
         document = render(queue[0], browser=args.browser, fontSize="8pt", 
-                          margin=".5in .25in .5in .5in", path=not args.no_path, relative=False, size=size, style=args.style)
+                          margin=".5in .25in .5in .5in", path=not args.no_path, prefix="L",
+                          relative=False, size=size, style=args.style)
         if not document:
             cancel(1)
         write(temps[0][1], [document], False)
 
         # Render second input
         temps.append(mkstemp())
-        margin = ".5in .5in .5in .25in" if len(queue) == 2 else ".5in .375in .5in .375in"
+        if len(queue) == 2:
+            margin = ".5in .5in .5in .25in"
+            prefix = "R"
+        else:
+            margin = ".5in .375in .5in .375in"
+            prefix = "M"
         document = render(queue[1], browser=args.browser, fontSize="8pt", 
-                          margin=margin, path=not args.no_path, relative=False, size=size, style=args.style)
+                          margin=margin, path=not args.no_path, prefix=prefix,
+                          relative=False, size=size, style=args.style)
         if not document:
             cancel(1)
         write(temps[1][1], [document], False)
@@ -262,7 +269,8 @@ def main():
         if len(queue) == 3:
             temps.append(mkstemp())
             document = render(queue[2], browser=args.browser, fontSize="8pt",
-                              margin=".5in .5in .5in .25in", path=not args.no_path, relative=False, size=size, style=args.style)
+                              margin=".5in .5in .5in .25in", path=not args.no_path, prefix="R",
+                              relative=False, size=size, style=args.style)
             if not document:
                 cancel(1)
             write(temps[2][1], [document], False)
@@ -419,7 +427,7 @@ def join(a, b):
         return os.path.normpath(os.path.join(os.path.dirname(a), b))
 
 
-def render(filename, size, browser=False, fontSize="10pt", margin=".5in", path=True, relative=True, style=None):
+def render(filename, size, browser=False, fontSize="10pt", margin=".5in", path=True, prefix="", relative=True, style=None):
     """Render file with filename as HTML page(s) of specified size."""
 
     # Rendering
@@ -482,6 +490,13 @@ def render(filename, size, browser=False, fontSize="10pt", margin=".5in", path=T
             except:
                 lexer = TextLexer()
         string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
+
+        # Add prefix to line numbers
+        soup = BeautifulSoup(string, "html.parser")
+        for span in soup.find_all("span", class_="linenos"):
+            text = re.sub(r"^(\s*)(\d+)$", f"\\1{prefix}\\2", span.getText())
+            span.string.replace_with(text)
+        string = str(soup)
 
         # Styles for document
         stylesheets = [
