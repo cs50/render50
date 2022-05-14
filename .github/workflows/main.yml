@@ -9,7 +9,7 @@ jobs:
         python-version: '3.6'
     - name: Run tests
       run: |
-        pip install --no-cache-dir .
+        pip install .
         render50 -h
         touch foo.c && render50 -o foo.pdf foo.c && test -f foo.pdf
     - name: Install pypa/build
