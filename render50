@@ -512,6 +512,9 @@ def render(filename, size, align="right", browser=False, fontSize="10pt", margin
                 lexer = TextLexer()
         string = highlight(code, lexer, HtmlFormatter(linenos="inline", nobackground=True))
 
+        # Remove trailing any whitespace by highlighting
+        string = string.rstrip()
+
         # Add prefix to line numbers
         soup = BeautifulSoup(string, "html.parser")
         for span in soup.find_all("span", class_="linenos"):
