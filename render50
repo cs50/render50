@@ -554,7 +554,6 @@ def write(output, documents, echo=True):
         merger = PdfFileMerger()
         for document in documents:
             merger.append(PdfFileReader(io.BytesIO(document.write_pdf())))
-
         merger.write(output)
         if echo:
             cprint("Rendered {}.".format(output), "green")
