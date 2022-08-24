@@ -3,6 +3,7 @@
 from signal import SIGINT, signal
 signal(SIGINT, lambda signum, frame: sys.exit(1))
 
+import io
 import os
 import re
 import sys
@@ -22,7 +23,7 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
 from pygments.styles import get_all_styles
-from PyPDF2 import PdfFileReader, PdfFileWriter
+from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from requests.exceptions import RequestException
 from tempfile import mkstemp
 from textwrap import fill
@@ -264,7 +265,7 @@ def main():
 
         # Render first input
         temps.append(mkstemp())
-        document = render(queue[0], browser=args.browser, fontSize="8pt", 
+        document = render(queue[0], browser=args.browser, fontSize="8pt",
                           margin=".5in .25in .5in .5in", path=not args.no_path, prefix="L",
                           relative=False, size=size, style=args.style)
         if not document:
@@ -279,7 +280,7 @@ def main():
         else:
             margin = ".5in .375in .5in .375in"
             prefix = "M"
-        document = render(queue[1], browser=args.browser, fontSize="8pt", 
+        document = render(queue[1], browser=args.browser, fontSize="8pt",
                           margin=margin, path=not args.no_path, prefix=prefix,
                           relative=False, size=size, style=args.style)
         if not document:
@@ -456,7 +457,7 @@ def render(filename, size, align="right", browser=False, fontSize="10pt", margin
 
     # Determine title
     title = filename if path else os.path.basename(filename)
-    
+
     # Render as a browser would
     if browser:
 
@@ -547,11 +548,14 @@ def render(filename, size, align="right", browser=False, fontSize="10pt", margin
 def write(output, documents, echo=True):
     """
     Write documents to output as PDF.
-    https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
+    https://doc.courtbouillon.org/weasyprint/stable/api_reference.html#weasyprint.HTML.write_pdf
     """
     if documents:
-        pages = [page for document in documents for page in document.pages]
-        documents[0].copy(pages).write_pdf(output)
+        merger = PdfFileMerger()
+        for document in documents:
+            merger.append(PdfFileReader(io.BytesIO(document.write_pdf())))
+
+        merger.write(output)
         if echo:
             cprint("Rendered {}.".format(output), "green")
         return True
