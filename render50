@@ -61,7 +61,7 @@ def main():
     parser.add_argument("-f", "--force", action="store_true", default=False, help="overwrite existing files without prompting")
     parser.add_argument("-i", "--include", action="append", help="pattern to include")
     parser.add_argument("-o", "--output", help="file to output", required=True)
-    parser.add_argument("-p", "--print", default="letter landscape", help="format for print, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size", metavar="SIZE")
+    parser.add_argument("-p", "--print", help="format for print, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size", metavar="SIZE")
     parser.add_argument("-P", "--no-path", action="store_true", default=False, help="omit paths in headers")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
     parser.add_argument("-s", "--screen", help="format for screen", metavar="SIZE")
