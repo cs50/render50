@@ -64,7 +64,7 @@ def main():
     parser.add_argument("-p", "--print", default="letter landscape", help="format for print, per https://developer.mozilla.org/en-US/docs/Web/CSS/@page/size", metavar="SIZE")
     parser.add_argument("-P", "--no-path", action="store_true", default=False, help="omit paths in headers")
     parser.add_argument("-r", "--recursive", action="store_true", help="recurse into directories")
-    parser.add_argument("-s", "--screen", action="store_const", const="480p", help="format for screen")
+    parser.add_argument("-s", "--screen", help="format for screen", metavar="SIZE")
     parser.add_argument("-S", "--style", default="default", help="style of syntax highlighting, per https://pygments.org/demo/#try")
     parser.add_argument("-x", "--exclude", action="append", help="pattern to exclude")
     parser.add_argument("-y", "--side-by-side", action="store_true", help="render inputs side by side")
