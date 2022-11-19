@@ -32,28 +32,6 @@ jobs:
       run: |
         echo ::set-output name=version::$(render50 --version | cut --delimiter ' ' --fields 2)
 
-    - name: Create Tag
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{ github.token }}
-        script: |
-          try {
-            await github.rest.git.updateRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: "tags/v${{ steps.program_version.outputs.version }}",
-              sha: context.sha,
-              force: true
-            })
-          } catch (e) {
-            await github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: "refs/tags/v${{ steps.program_version.outputs.version }}",
-              sha: context.sha
-            })
-          }
-
     - name: Create Release
       uses: actions/github-script@v6
       with:
