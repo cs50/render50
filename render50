@@ -23,7 +23,7 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
 from pygments.styles import get_all_styles
-from PyPDF2 import PdfMerger, PdfReader, PdfFileWriter
+from PyPDF2 import PdfReader, PdfFileWriter
 from requests.exceptions import RequestException
 from tempfile import mkstemp
 from textwrap import fill
@@ -548,13 +548,13 @@ def render(filename, size, align="right", browser=False, fontSize="10pt", margin
 def write(output, documents, echo=True):
     """
     Write documents to output as PDF.
-    https://doc.courtbouillon.org/weasyprint/stable/api_reference.html#weasyprint.HTML.write_pdf
+    https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
+    https://github.com/Kozea/WeasyPrint/issues/1662#issuecomment-1226058917
     """
     if documents:
-        merger = PdfMerger()
-        for document in documents:
-            merger.append(PdfReader(io.BytesIO(document.write_pdf())))
-        merger.write(output)
+        pages = [page for document in documents for page in document.pages]
+        documents[0].copy(pages).write_pdf(output)
+
         if echo:
             cprint("Rendered {}.".format(output), "green")
         return True
