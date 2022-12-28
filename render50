@@ -23,7 +23,7 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
 from pygments.styles import get_all_styles
-from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
+from PyPDF2 import PdfMerger, PdfReader, PdfFileWriter
 from requests.exceptions import RequestException
 from tempfile import mkstemp
 from textwrap import fill
@@ -335,13 +335,13 @@ def concatenate(output, inputs):
     """Concatenate (PDF) inputs side by side."""
 
     # Read files
-    readers = list(map(PdfFileReader, inputs))
+    readers = list(map(PdfReader, inputs))
 
     # Render blank page, inferring size from first input's first page
     temp = mkstemp()
     size = "{}pt {}pt".format(readers[0].getPage(0).mediaBox[2], readers[0].getPage(0).mediaBox[3])
     write(temp[1], [blank(size)], False)
-    page = PdfFileReader(temp[1]).getPage(0)
+    page = PdfReader(temp[1]).getPage(0)
 
     # Concatenate files side by side
     writer = PdfFileWriter()
@@ -551,9 +551,9 @@ def write(output, documents, echo=True):
     https://doc.courtbouillon.org/weasyprint/stable/api_reference.html#weasyprint.HTML.write_pdf
     """
     if documents:
-        merger = PdfFileMerger()
+        merger = PdfMerger()
         for document in documents:
-            merger.append(PdfFileReader(io.BytesIO(document.write_pdf())))
+            merger.append(PdfReader(io.BytesIO(document.write_pdf())))
         merger.write(output)
         if echo:
             cprint("Rendered {}.".format(output), "green")
