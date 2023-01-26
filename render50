@@ -81,7 +81,11 @@ def main():
     if args.INPUT:
         inputs = args.INPUT
     else:
-        inputs = [line.strip() for line in sys.stdin.readlines()]
+        inputs = []
+        for line in sys.stdin.readlines():
+            elements = re.split(r"(?:^|[^\\])#", line.strip())
+            if element := elements[0].rstrip().replace("\#", "#"):
+                inputs += [element]
 
     # Check for includes
     includes = []
