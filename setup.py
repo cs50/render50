@@ -18,5 +18,5 @@ setup(
     python_requires=">=3.6",
     scripts=["render50"],
     url="https://github.com/cs50/render50",
-    version="9.1.0"
+    version="9.1.1"
 )

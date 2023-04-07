@@ -5,9 +5,10 @@ signal(SIGINT, lambda signum, frame: sys.exit(1))
 
 import io
 import os
+import pygments.lexers.sql
 import re
-import sys
 import requests
+import sys
 import termcolor
 
 from argparse import ArgumentParser
@@ -43,6 +44,10 @@ except DistributionNotFound:
     __version__ = "UNKNOWN"
 else:
     __version__ = d.version
+
+# Prioritize these languages
+# https://github.com/pygments/pygments/issues/2405
+pygments.lexers.sql.SqlLexer.priority = 1
 
 
 def main():
