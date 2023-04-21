@@ -24,7 +24,7 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
 from pygments.lexers.special import TextLexer
 from pygments.styles import get_all_styles
-from PyPDF2 import PdfReader, PdfFileWriter
+from pypdf import PdfReader, PdfWriter, Transformation
 from requests.exceptions import RequestException
 from tempfile import mkstemp
 from textwrap import fill
@@ -348,26 +348,27 @@ def concatenate(output, inputs):
 
     # Render blank page, inferring size from first input's first page
     temp = mkstemp()
-    size = "{}pt {}pt".format(readers[0].getPage(0).mediaBox[2], readers[0].getPage(0).mediaBox[3])
+    size = "{}pt {}pt".format(readers[0].pages[0].mediabox[2], readers[0].pages[0].mediabox[3])
     write(temp[1], [blank(size)], False)
-    page = PdfReader(temp[1]).getPage(0)
+    page = PdfReader(temp[1]).pages[0]
 
     # Concatenate files side by side
-    writer = PdfFileWriter()
+    writer = PdfWriter()
 
     # Concatenate pages
-    for i in range(max(map(lambda r: r.getNumPages(), readers))):
+    for i in range(max(map(lambda r: len(r.pages), readers))):
 
         # Leftmost page
-        left = copy(readers[0].getPage(i)) if i < readers[0].getNumPages() else copy(page)
+        left = copy(readers[0].pages[i]) if i < len(readers[0].pages) else copy(page)
 
         # Rightmost pages
         for reader in readers[1:]:
-            right = copy(reader.getPage(i)) if i < reader.getNumPages() else copy(page)
-            left.mergeTranslatedPage(right, left.mediaBox[2], 0, expand=True)
+            right = copy(reader.pages[i]) if i < len(reader.pages) else copy(page)
+            right.add_transformation(Transformation().translate(left.mediabox[2], 0))
+            left.merge_page(right, True)
 
         # Add pages to output
-        writer.addPage(left)
+        writer.add_page(left)
 
     # Ouput PDF
     with open(output, "wb") as file:
