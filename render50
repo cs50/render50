@@ -364,8 +364,7 @@ def concatenate(output, inputs):
         # Rightmost pages
         for reader in readers[1:]:
             right = copy(reader.pages[i]) if i < len(reader.pages) else copy(page)
-            right.add_transformation(Transformation().translate(left.mediabox[2], 0))
-            left.merge_page(right, True)
+            left.merge_transformed_page(right, Transformation().translate(left.mediabox[2], 0), expand=True)
 
         # Add pages to output
         writer.add_page(left)
