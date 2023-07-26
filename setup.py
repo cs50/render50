@@ -15,7 +15,7 @@ setup(
     license="GPLv3",
     long_description_content_type="text/markdown",
     name="render50",
-    python_requires=">=3.6",
+    python_requires=">=3.9",
     scripts=["render50"],
     url="https://github.com/cs50/render50",
     version="9.2.1"

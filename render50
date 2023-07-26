@@ -559,11 +559,12 @@ def write(output, documents, echo=True):
     Write documents to output as PDF.
     https://github.com/Kozea/WeasyPrint/issues/212#issuecomment-52408306
     https://github.com/Kozea/WeasyPrint/issues/1662#issuecomment-1226058917
+    https://github.com/Kozea/WeasyPrint/issues/531#issuecomment-1635857701
     """
     if documents:
         pages = [page for document in documents for page in document.pages]
-        documents[0].copy(pages).write_pdf(output)
-
+        options = DEFAULT_OPTIONS | {"pdf_variant": "pdf/ua-1"}
+        documents[0].copy(pages).write_pdf(output, options=options)
         if echo:
             cprint("Rendered {}.".format(output), "green")
         return True
@@ -576,7 +577,7 @@ def write(output, documents, echo=True):
 try:
     # Ignore warnings about outdated Cairo and Pango (on Ubuntu 14.04, at least)
     filterwarnings("ignore", category=UserWarning, module="weasyprint")
-    from weasyprint import CSS, HTML
+    from weasyprint import CSS, DEFAULT_OPTIONS, HTML
     from weasyprint.urls import URLFetchingError
 except OSError as e:
     if "pangocairo" in str(e):
