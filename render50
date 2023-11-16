@@ -33,9 +33,9 @@ from urllib.parse import urljoin
 from warnings import filterwarnings
 
 
-# Require Python 3.6+
-if sys.version_info < (3, 6):
-    sys.exit("You have an old version of python. Install version 3.6 or higher.")
+# Require Python 3.9+
+if sys.version_info < (3, 9):
+    sys.exit("You have an old version of python. Install version 3.9 or higher.")
 
 # Get version
 try:
