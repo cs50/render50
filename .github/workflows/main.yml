@@ -44,3 +44,16 @@ jobs:
             tag_name: "v${{ steps.program_version.outputs.version }}",
             tag_commitish: "${{ github.sha }}"
           })
+
+      - name: Re-deploy dependent
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.DEPLOY50_PAT }}
+          script: |
+              await github.rest.actions.createWorkflowDispatch({
+                owner: 'cs50',
+                repo: 'render.cs50.io',
+                workflow_id: 'main.yml',
+                ref: 'main'
+              });
