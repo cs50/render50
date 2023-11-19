@@ -89,20 +89,20 @@ def main():
         inputs = []
         for line in sys.stdin.readlines():
             elements = re.split(r"(?:^|[^\\])#", line.strip())
-            if element := elements[0].rstrip().replace("\#", "#"):
+            if element := elements[0].rstrip().replace(r"\#", "#"):
                 inputs += [element]
 
     # Check for includes
     includes = []
     if args.include:
         for i in args.include:
-            includes.append(re.escape(i).replace("\*", ".*"))
+            includes.append(re.escape(i).replace(r"\*", ".*"))
 
     # Check for excludes
     excludes = []
     if args.exclude:
         for x in args.exclude:
-            excludes.append(re.escape(x).replace("\*", ".*"))
+            excludes.append(re.escape(x).replace(r"\*", ".*"))
 
     # Check stdin for inputs else command line
     patterns = []
@@ -238,7 +238,7 @@ def main():
             page = get(queue[0])
             soup = BeautifulSoup(page, "html.parser")
             framesets = soup.find_all(
-                "frameset", {"cols": re.compile("(50%,\s*50%|33%,\s*33%,\s*33%)")})
+                "frameset", {"cols": re.compile(r"(50%,\s*50%|33%,\s*33%,\s*33%)")})
             assert len(framesets) == 1
             frames = framesets[0].find_all("frame")
             assert 2 <= len(frames) <= 3
