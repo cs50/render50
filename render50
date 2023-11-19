@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from copy import copy
 from glob import glob
 from natsort import natsorted, ns
-from pkg_resources import DistributionNotFound, get_distribution
+from importlib.metadata import PackageNotFoundError, version
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename, guess_lexer
@@ -39,11 +39,9 @@ if sys.version_info < (3, 9):
 
 # Get version
 try:
-    d = get_distribution("render50")
-except DistributionNotFound:
+    __version__ = version("render50")
+except PackageNotFoundError:
     __version__ = "UNKNOWN"
-else:
-    __version__ = d.version
 
 # Prioritize these languages
 # https://github.com/pygments/pygments/issues/2405
