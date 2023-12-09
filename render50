@@ -359,6 +359,11 @@ def concatenate(output, inputs):
         # Leftmost page
         left = copy(readers[0].pages[i]) if i < len(readers[0].pages) else copy(page)
 
+        # Rotate page
+        # https://github.com/py-pdf/pypdf/issues/2139#issuecomment-1702462468
+        # https://stackoverflow.com/a/75646585
+        left.transfer_rotation_to_content()
+
         # Rightmost pages
         for reader in readers[1:]:
             right = copy(reader.pages[i]) if i < len(reader.pages) else copy(page)
