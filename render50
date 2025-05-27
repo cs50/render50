@@ -3,11 +3,11 @@
 from signal import SIGINT, signal
 signal(SIGINT, lambda signum, frame: sys.exit(1))
 
-import io
 import os
 import pygments.lexers.sql
 import re
 import requests
+import shutil
 import sys
 import termcolor
 
@@ -383,7 +383,7 @@ def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
-    columns, _ = os.get_terminal_size()
+    columns, _ = get_terminal_size_fallback()
     if columns == 0:
         columns = 80
 
@@ -442,6 +442,16 @@ def get(file):
                 raise RuntimeError("Could not find {}.".format(file))
             else:
                 raise RuntimeError("Could not read {}.".format(file))
+
+
+def get_terminal_size_fallback():
+    try:
+        # Attempt to get terminal size
+        columns, _ = os.get_terminal_size()
+    except OSError:
+        # Fallback to default size if running in a non-terminal environment
+        columns, _ = shutil.get_terminal_size(fallback=(80, 20))
+    return columns
 
 
 def join(a, b):
