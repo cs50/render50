@@ -381,13 +381,7 @@ def concatenate(output, inputs):
 
 def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
-
-    # Assume 80 in case not running in a terminal
-    columns, _ = get_terminal_size_fallback()
-    if columns == 0:
-        columns = 80
-
-    # Print text, flushing output
+    columns, _ = shutil.get_terminal_size()
     termcolor.cprint(fill(text, columns, drop_whitespace=False, replace_whitespace=False),
                      color=color, on_color=on_color, attrs=attrs, end=end)
     sys.stdout.flush()
@@ -442,16 +436,6 @@ def get(file):
                 raise RuntimeError("Could not find {}.".format(file))
             else:
                 raise RuntimeError("Could not read {}.".format(file))
-
-
-def get_terminal_size_fallback():
-    try:
-        # Attempt to get terminal size
-        columns, rows = os.get_terminal_size()
-    except OSError:
-        # Fallback to default size if running in a non-terminal environment
-        columns, rows = shutil.get_terminal_size(fallback=(80, 20))
-    return columns, rows
 
 
 def join(a, b):
