@@ -12,7 +12,6 @@ import sys
 import termcolor
 
 from argparse import ArgumentParser
-from backports.shutil_get_terminal_size import get_terminal_size
 from braceexpand import braceexpand
 from bs4 import BeautifulSoup
 from copy import copy
@@ -384,7 +383,7 @@ def cprint(text="", color=None, on_color=None, attrs=None, end="\n"):
     """Colorize text (and wraps to terminal's width)."""
 
     # Assume 80 in case not running in a terminal
-    columns, _ = get_terminal_size()
+    columns, _ = os.get_terminal_size()
     if columns == 0:
         columns = 80
 
