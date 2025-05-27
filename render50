@@ -447,11 +447,11 @@ def get(file):
 def get_terminal_size_fallback():
     try:
         # Attempt to get terminal size
-        columns, _ = os.get_terminal_size()
+        columns, rows = os.get_terminal_size()
     except OSError:
         # Fallback to default size if running in a non-terminal environment
-        columns, _ = shutil.get_terminal_size(fallback=(80, 20))
-    return columns
+        columns, rows = shutil.get_terminal_size(fallback=(80, 20))
+    return columns, rows
 
 
 def join(a, b):
