@@ -115,7 +115,14 @@ def main():
             paths += [pattern]
         if pattern:
             for expression in list(braceexpand(pattern)):
-                paths += natsorted(glob(expression, recursive=True), alg=ns.IGNORECASE)
+                matches = natsorted(glob(expression, recursive=True), alg=ns.IGNORECASE)
+                if not matches and not expression.startswith(("http", "https")):
+                    if re.search(r"[*?\[\]]", expression):
+                        msg = "No files matched the pattern '{}'".format(os.path.basename(expression))
+                    else:
+                        msg = "File '{}' does not exist.".format(expression)
+                    raise RuntimeError(msg)
+                paths += matches
 
     # Candidates to render
     candidates = []
@@ -168,7 +175,7 @@ def main():
         if not args.INPUT:  # If using stdin for inputs
             raise RuntimeError("Output exists.")
         while True:
-            s = input("Overwrite {}? ".format(output))
+            s = input("Overwrite {}? [y/n] ".format(output))
             if s.lower() in ["y", "yes"]:
                 break
             elif s.lower() in ["n", "no"]:
@@ -178,7 +185,7 @@ def main():
     dirname = os.path.dirname(os.path.realpath(output))
     if not os.path.isdir(dirname):
         while True:
-            s = input("Create {}? ".format(dirname)).strip()
+            s = input("Create {}? [y/n] ".format(dirname)).strip()
             if s.lower() in ["n", "no"]:
                 cancel()
             elif s.lower() in ["y", "yes"]:
